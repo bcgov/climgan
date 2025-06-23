@@ -1,0 +1,18 @@
+# Requirements
+tqdm
+scipy
+numpy
+matplotlib
+torch
+xarray
+netCDF4
+h5netcdf
+dask
+pandas
+scikit_learn
+zarr
+torchvision
+mlflow
+dask[distributed]
+pytorch-msssim
+cloudpickle
