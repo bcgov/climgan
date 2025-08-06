@@ -125,7 +125,7 @@ class Critic(nn.Module):
 
         self.features_all = nn.Sequential(
             nn.Conv2d(
-                12 * self.coarse_dim,
+                10 * self.coarse_dim,
                 12 * self.coarse_dim,
                 kernel_size=3,
                 stride=1,
@@ -135,7 +135,7 @@ class Critic(nn.Module):
         )
 
         self.classifier = nn.Sequential(
-            nn.Linear(int((self.coarse_dim*12)*(self.fine_dim/2**4)**2), 100),
+            nn.Linear(int((6*6)*(12*12)), 100),
             # nn.Linear(32*24 * self.coarse_dim, 100),
             #nn.Linear(int(221184), 100),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),

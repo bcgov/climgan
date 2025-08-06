@@ -3,7 +3,14 @@ title: "PRISM_Prediction"
 author: "Kiri, Susan"
 format: html
 editor: visual
+execute: 
+  python: C:\\Program Files\\Python311\\python.exe
 ---
+
+```{r}
+library(reticulate)
+use_python("C:\\Program Files\\Python311\\python.exe", required = TRUE)
+```
 
 ```{python}
 import torch
@@ -13,14 +20,50 @@ import xarray as xr
 from matplotlib import pyplot as plt
 from matplotlib import colorbar, colors, gridspec
 import os
+
+
 ```
 
 ```{python}
+import climgan
 from climgan.networks.prism_generator import Generator
 from climgan.networks.critic_covariates import Critic
 era5 = torch.load("../data/era5_tiles_346.pt")
-era5 = torch.load("../data/era5_tiles_346.pt")
-era5 = torch.load("../data/era5_tiles_346.pt")
+dem = torch.load("../data/dem_tiles_346.pt")
+prism = torch.load("../data/prism_tiles_346.pt")
+
+plt.close()
+plt.imshow(prism[42,...])
+plt.show()
+
+plt.close()
+plt.imshow(dem[42,...])
+plt.show()
+
+plt.close()
+plt.imshow(era5[42,...])
+plt.show()
+```
+
+## Test networks
+
+```{python}
+lr_test = era5[:8,...].unsqueeze(1).to("cuda")
+hr_test = prism[:8,...].unsqueeze(1).to("cuda")
+dem_test = dem[:8,...].unsqueeze(1).to("cuda")
+
+critic = Critic(12, 144, 1, 1, 1).to("cuda")
+
+generator = Generator(12, 144, 1, 1, 1).to("cuda:0")
+test = generator(lr_test.to("cuda"),hr_test.to("cuda"))
+
+test2 = critic(hr_test, dem_test, lr_test)
+
+plt.close()
+plt.imshow(test[3,0,...].cpu().detach())
+plt.show()
+
+
 ```
 
 # Stack Covariates

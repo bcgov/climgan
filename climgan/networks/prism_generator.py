@@ -199,7 +199,7 @@ class Generator(nn.Module):
         n_predictands=1,
         num_res_blocks=14,
         num_res_blocks_fine=2,
-        num_upsample=2,
+        num_upsample=3,
     ):
         super().__init__()
         self.fine_res = fine_dims
