@@ -196,9 +196,9 @@ class Generator(nn.Module):
         fine_dims,
         channels,
         channels_hr_cov=1,
-        n_predictands=2,
+        n_predictands=1,
         num_res_blocks=14,
-        num_res_blocks_fine=1,
+        num_res_blocks_fine=2,
         num_upsample=2,
     ):
         super().__init__()
@@ -233,11 +233,12 @@ class Generator(nn.Module):
 
         # Upsampling layers
         upsample_layers = []
-        for _ in range(num_upsample):
+        upsample_factors = [2,3,2]
+        for i in range(num_upsample):
             upsample_layers += [
-                nn.Conv2d(filters, filters * 4, kernel_size=3, stride=1, padding=1),
+                nn.Conv2d(filters, filters * (upsample_factors[i]**2), kernel_size=3, stride=1, padding=1),
                 nn.LeakyReLU(),
-                nn.PixelShuffle(upscale_factor=2),
+                nn.PixelShuffle(upscale_factor=upsample_factors[i]),
             ]
         self.upsampling = nn.Sequential(*upsample_layers)
         # Final output block

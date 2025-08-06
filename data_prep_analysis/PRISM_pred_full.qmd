@@ -12,12 +12,21 @@ import mlflow
 import xarray as xr
 from matplotlib import pyplot as plt
 from matplotlib import colorbar, colors, gridspec
+import os
+```
+
+```{python}
+from climgan.networks.prism_generator import Generator
+from climgan.networks.critic_covariates import Critic
+era5 = torch.load("../data/era5_tiles_346.pt")
+era5 = torch.load("../data/era5_tiles_346.pt")
+era5 = torch.load("../data/era5_tiles_346.pt")
 ```
 
 # Stack Covariates
 
 ```{r}
-
+reticulate::py_install("climgan")
 library(data.table)
 library(terra)
 ```
