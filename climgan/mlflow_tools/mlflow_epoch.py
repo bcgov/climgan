@@ -77,7 +77,7 @@ def log_network_models(C, G, epoch):
     #mlflow.pytorch.log_model(C, f"Critic/Critic_{epoch}")
     #mlflow.pytorch.log_state_dict(C.state_dict(), f"Critic/Critic_{epoch}")
     g_scripted = torch.jit.script(G)
-    g_path = config.GENERATOR_PATH + f"Generators/Generator_{epoch}.pt"
+    g_path = config.GENERATOR_PATH + f"/Generator_{epoch}.pt"
     g_scripted.save(g_path)
     # mlflow.pytorch.log_model(G, f"Generator/Generator_{epoch}")
     # mlflow.pytorch.log_state_dict(G.state_dict(), f"Generator/Generator_{epoch}")

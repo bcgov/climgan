@@ -64,7 +64,7 @@ class WassersteinGAN:
             g_loss = -torch.mean(c_fake) * hp.gamma + hp.content_lambda * cont_loss   
         else: ##stochastic sampling
             c_fake = self.C(fake,invariant,coarse) ## wasserstein distance
-            dat_gen = [self.G(coarse, invariant)[0] for i in range(n_realisation)]
+            dat_gen = [self.G(coarse, invariant) for i in range(n_realisation)]
             dat_sr = [torch.cat([x[ind,...].unsqueeze(0) for x in dat_gen],dim = 0) for ind in range(coarse.shape[0])]
             dat_hr = [fine[i,...] for i in range(coarse.shape[0])]
             crps_ls = [crps_empirical(sr,hr) for sr,hr in zip(dat_sr,dat_hr)]
