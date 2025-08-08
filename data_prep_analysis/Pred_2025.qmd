@@ -163,7 +163,8 @@ def trim_tiles(tiles, batch_size):
   
   return tiles
 
-def fill_tile_nans_with_mean(tiles):
+def na_to_mean(tiles):
+  """ only pass in a tensor in shape [numtiles, dim, dim] """
     return torch.stack([
         torch.where(
             torch.isnan(tile),
@@ -234,9 +235,9 @@ clean_era5 = trim_tiles(clean_era5, 10)
 clean_dem = trim_tiles(clean_dem, 10)
 
 # replace any NAs in testing tiles with tile mean
-clean_prism_test = fill_tile_nans_with_mean(prism_tiles_flat_test)
-clean_era5_test = fill_tile_nans_with_mean(era5_tiles_flat_test)
-clean_dem_test = fill_tile_nans_with_mean(dem_tiles_flat_test)
+clean_prism_test = na_to_mean(prism_tiles_flat_test)
+clean_era5_test = na_to_mean(era5_tiles_flat_test)
+clean_dem_test = na_to_mean(dem_tiles_flat_test)
 
 torch.save(clean_prism, prism_folder + "prism_tiles.pt")
 torch.save(clean_era5, era5_folder + "era5_tiles.pt")
