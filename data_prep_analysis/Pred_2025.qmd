@@ -45,13 +45,19 @@ plot(prism)
 ```
 
 ```{python}
-def slice_map(dataset, num_pixels):
+def slice_map(dataset, num_pixels, save_path_train=None, save_path_test=None):
   """ function to slice out an area defined by num of pixels from the left """
   array = dataset.to_array()
   dim = array.dims[-1]
-  
+
   array_cropped = array.isel({dim: slice(num_pixels, None)})
   test_array  = array.isel({dim: slice(0, num_pixels)})
+  
+  # save the cropped maps for later comparison if needed
+  if save_path_train:
+        array_cropped.to_netcdf(save_path_train)
+  if save_path_test:
+        test_array.to_netcdf(save_path_test)
 
   cropped = torch.from_numpy(array_cropped.to_numpy())[0,...]
   test  = torch.from_numpy(test_array.to_numpy())[0,...]
@@ -95,7 +101,7 @@ prism_fields = xr.open_dataset(prism_folder + "prism_train_coarse.nc")
 #prism = torch.from_numpy(prism_fields.to_array().to_numpy())[0,...]
 
 # chop a slice of Alaska PRISM off and save as testing data
-prism_cropped, prism_test = slice_map(prism_fields, 288)
+prism_cropped, prism_test = slice_map(prism_fields, 288, prism_folder + "prism_train_cropped.nc", prism_folder + "prism_test_cropped.nc")
 
 # standardize - PRISM already standardized
 
@@ -124,7 +130,6 @@ plt.show()
 plt.close()
 plt.imshow(standardized_dem_test)
 plt.show()
-
 ```
 
 ## Make tiles:
