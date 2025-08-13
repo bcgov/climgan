@@ -18,15 +18,15 @@ from mlflow.tracking import MlflowClient
 highres_in = True
 toydata = False
 rotation = False
-data_folder = "/home/kiridaust/PRISM_Data/dec/"
+data_folder = "/users/kdaust/FFEC/climgan/data/"
 
 def load_preprocessed():
-    coarse_train = torch.load(data_folder + "worldclim_train.pt")
-    coarse_test = torch.load(data_folder + "worldclim_train.pt")
-    fine_train = torch.load(data_folder + "prism_train.pt")
-    fine_test = torch.load(data_folder + "prism_train.pt")
-    hrcov_train = torch.load(data_folder + "HR_covariates_train.pt")
-    hrcov_test = torch.load(data_folder + "HR_covariates_train.pt")
+    coarse_train = torch.load(data_folder + "era5_tiles_3001.pt")[:3000,...].unsqueeze(1)
+    coarse_test = torch.load(data_folder + "era5_tiles_3001.pt")[:3000,...].unsqueeze(1)
+    fine_train = torch.load(data_folder + "prism_tiles_3001.pt")[:3000,...].unsqueeze(1)
+    fine_test = torch.load(data_folder + "prism_tiles_3001.pt")[:3000,...].unsqueeze(1)
+    hrcov_train = torch.load(data_folder + "dem_tiles_3001.pt")[:3000,...].unsqueeze(1)
+    hrcov_test = torch.load(data_folder + "dem_tiles_3001.pt")[:3000,...].unsqueeze(1)
     return coarse_train, fine_train, coarse_test, fine_test, hrcov_train, hrcov_test
 
 

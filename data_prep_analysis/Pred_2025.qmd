@@ -1,0 +1,413 @@
+---
+title: "2025 GAN Runs"
+author: "Tirion"
+format: html
+editor: visual
+---
+
+```{python}
+import torch
+import numpy as np
+import mlflow
+import xarray as xr
+from matplotlib import pyplot as plt
+from matplotlib import colorbar, colors, gridspec
+```
+
+## Load training data:
+
+```{r}
+library(data.table)
+library(terra)
+```
+
+```{r}
+prism_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/mar/"
+
+era5_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/era5_clim/tasmax/"
+
+dem_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/dem/"
+
+dem <- rast(paste(dem_folder, "dem_NWNA_coarse.nc", sep = ""))
+
+plot(dem)
+
+era5 <- rast(paste(era5_folder, "tasmax_1981_2010_cropped.nc", sep = ""))
+
+plot(era5[[3]]) # by month
+
+prism <- rast(paste(prism_folder, "prism_train_coarse.nc", sep=""))
+
+dim(era5)
+dim(prism)
+dim(dem)
+plot(prism)
+```
+
+```{python}
+def slice_map(dataset, num_pixels, save_path_train=None, save_path_test=None, include_coords=False):
+  """ function to slice out an area defined by num of pixels from the left """
+  array = dataset.to_array()
+  dim = array.dims[-1]
+
+  array_cropped = array.isel({dim: slice(num_pixels, None)})
+  test_array  = array.isel({dim: slice(0, num_pixels)})
+
+  cropped = torch.from_numpy(array_cropped.to_numpy())[0,...]
+  test  = torch.from_numpy(test_array.to_numpy())[0,...]
+        
+  # save latitude/longitude
+  if (include_coords):
+    lat_vals = dataset["latitude"].values
+    lon_vals = dataset["longitude"].values
+    
+    if lat_vals.ndim == 1 and lon_vals.ndim == 1:
+        lon_vals, lat_vals = np.meshgrid(lon_vals, lat_vals)
+        
+    lat_cropped = lat_vals[:, num_pixels:]
+    lon_cropped = lon_vals[:, num_pixels:]
+    lat_test = lat_vals[:, :num_pixels]
+    lon_test = lon_vals[:, :num_pixels]
+    
+    lat_cropped_tensor = torch.from_numpy(lat_cropped).float().unsqueeze(0)
+    lon_cropped_tensor = torch.from_numpy(lon_cropped).float().unsqueeze(0)
+    lat_test_tensor = torch.from_numpy(lat_test).float().unsqueeze(0)
+    lon_test_tensor = torch.from_numpy(lon_test).float().unsqueeze(0)
+    
+    cropped = torch.cat([cropped, lat_cropped_tensor, lon_cropped_tensor], dim=0)
+    test = torch.cat([test, lat_test_tensor, lon_test_tensor], dim=0)
+    
+  # save the cropped maps for later comparison if needed
+  if save_path_train:
+        torch.save(cropped, save_path_train)
+  if save_path_test:
+        torch.save(test, save_path_test)
+
+  return cropped, test
+
+def standardize(cropped, test):
+  mask = ~torch.isnan(cropped)
+  mean = cropped[mask].mean()
+  std = cropped[mask].std()
+  standardized = (cropped - mean) / std
+  standardized_test = (test - mean) / std
+  
+  return standardized, standardized_test, mean, std
+
+# load in folders  
+era5_folder = r.era5_folder
+prism_folder = r.prism_folder
+dem_folder = r.dem_folder
+
+## ERA5
+era5_fields = xr.open_dataset(era5_folder + "tasmax_1981_2010_cropped.nc")
+#era5 = torch.from_numpy(era5_fields.to_array().to_numpy())[0,...]
+
+# chop a slice of Alaska ERA5 off and save as testing data
+era5_cropped, era5_test = slice_map(era5_fields, 24, era5_folder + "era5_tasmax_train_cropped.pt", era5_folder + "era5_tasmax_test_cropped.pt", True)
+
+# standardize
+standardized_era5, standardized_era5_test, era5_mean, era5_std = standardize(era5_cropped, era5_test)
+
+plt.close()
+plt.imshow(standardized_era5[2]) # by month
+plt.show()
+
+plt.close()
+plt.imshow(standardized_era5_test[2]) # by month
+plt.show()
+
+## PRISM
+prism_fields = xr.open_dataset(prism_folder + "prism_train_coarse.nc")
+#prism = torch.from_numpy(prism_fields.to_array().to_numpy())[0,...]
+
+# chop a slice of Alaska PRISM off and save as testing data
+prism_cropped, prism_test = slice_map(prism_fields, 288, prism_folder + "prism_train_cropped.pt", prism_folder + "prism_test_cropped.pt")
+
+# standardize - PRISM already standardized
+
+plt.close()
+plt.imshow(prism_cropped)
+plt.show()
+
+plt.close()
+plt.imshow(prism_test)
+plt.show()
+
+## DEM
+dem_fields = xr.open_dataset(dem_folder + "dem_NWNA_coarse.nc")
+#dem = torch.from_numpy(dem_fields.to_array().to_numpy())[0,...]
+
+# chop a slice of Alaska dem off and save as testing data
+dem_cropped, dem_test = slice_map(dem_fields, 288, dem_folder + "dem_train_cropped.pt", dem_folder + "dem_test_cropped.pt")
+
+# standardize
+standardized_dem, standardized_dem_test, dem_mean, dem_std = standardize(dem_cropped, dem_test)
+
+plt.close()
+plt.imshow(standardized_dem)
+plt.show()
+
+plt.close()
+plt.imshow(standardized_dem_test)
+plt.show()
+```
+
+## Make tiles:
+
+```{python}
+import math
+
+def tile_data(tensor, tile_size, offset):
+  h, w = tensor.size(1), tensor.size(2)
+  res_ls = []
+  for y in range(int(math.ceil(h/offset))):
+    for x in range(int(math.ceil(w/offset))):
+      curr = tensor[:, offset*y:min(offset*y+tile_size, h), offset*x:min(offset*x+tile_size, w)]
+      if(y == 0):
+        res_ls.append([curr])
+      else:
+        res_ls[x].append(curr)
+  res_pad = [[torch.nn.functional.pad(ten, (0,tile_size-ten.shape[2],0,tile_size - ten.shape[1],0,0), mode = "constant", value = 0) for ten in x] for x in res_ls]
+  return(res_pad)
+
+def remove_tiles(prism, era5, dem):
+  assert prism.size(0) == era5.size(0) == dem.size(0), "Tensors must be same size"
+  nan_mask = torch.isnan(prism)
+  bad_tiles = nan_mask.view(prism.size(0), -1).any(dim=1)
+  clean_prism = prism[~bad_tiles]
+  clean_era5 = era5[~bad_tiles]
+  clean_dem = dem[~bad_tiles]
+  return clean_prism, clean_era5, clean_dem
+
+def trim_tiles(tiles, batch_size):
+  num_tiles = tiles.shape[0]
+  remainder = num_tiles % batch_size
+  
+  if remainder != 0:
+      tiles = tiles[:-remainder]
+  
+  return tiles
+
+import torch
+
+def na_to_mean(tiles):
+    """Only pass in a tensor in shape [numtiles, dim, dim]"""
+    return torch.stack([
+        torch.where(
+            torch.isnan(tile),
+            torch.full_like(
+                tile,
+                tile[~torch.isnan(tile)].mean() if torch.any(~torch.isnan(tile)) else 0.0
+            ),
+            tile
+        )
+        for tile in tiles
+    ])
+    
+def add_covariates_era5(months, tensor):
+  """ add specified months and lat/long layers to tensor """
+  tiles_per_month = []
+
+  for m in months:
+      tiles = tile_data(tensor[m].unsqueeze(0), int(tile_size / scale_factor), int(offset / scale_factor))
+      
+      plt.close()
+      plt.imshow(tiles[4][8][0,...])
+      plt.show()
+
+      # Flatten tile list-of-lists
+      flat_tiled = [tile for row in tiles for tile in row]
+      tiles_per_month.append(flat_tiled)
+
+  tiles = torch.stack([
+      torch.cat([tiles_per_month[m][i] for m in range(len(months))], dim=0)
+      for i in range(len(tiles_per_month[0]))
+])
+  return tiles
+    
+scale_factor = 12
+tile_size = 144
+offset = 12
+
+## PRISM
+prism_tiles = tile_data(prism_cropped.unsqueeze(0), tile_size, offset)
+prism_test_tiles = tile_data(prism_test.unsqueeze(0), tile_size, offset)
+
+## ERA5
+# era5_tiles = tile_data(standardized_era5[2].unsqueeze(0), int(tile_size / scale_factor), int(offset / scale_factor))
+# era5_test_tiles = tile_data(standardized_era5_test[2].unsqueeze(0), int(tile_size / scale_factor), int(offset / scale_factor))
+
+era5_tiles = add_covariates_era5([0,1,2,12,13], standardized_era5)
+era5_test_tiles = add_covariates_era5([0,1,2,12,13], standardized_era5_test)
+
+## DEM
+dem_tiles = tile_data(standardized_dem.unsqueeze(0), tile_size, offset)
+dem_test_tiles = tile_data(standardized_dem_test.unsqueeze(0), tile_size, offset)
+
+plt.close()
+plt.imshow(prism_tiles[4][8][0,...])
+plt.show()
+
+# plt.close()
+# plt.imshow(era5_tiles[4][8][0,...])
+# plt.show()
+
+plt.close()
+plt.imshow(dem_tiles[4][8][0,...])
+plt.show()
+
+prism_tiles_flat = torch.cat([tile for row in prism_tiles for tile in row], dim=0)
+# era5_tiles_flat = torch.cat([tile for row in era5_tiles for tile in row], dim=0)
+era5_tiles_flat = era5_tiles
+dem_tiles_flat = torch.cat([tile for row in dem_tiles for tile in row], dim=0)
+
+prism_tiles_flat_test = torch.cat([tile for row in prism_test_tiles for tile in row], dim=0)
+# era5_tiles_flat_test = torch.cat([tile for row in era5_test_tiles for tile in row], dim=0)
+era5_tiles_flat_test = era5_test_tiles
+dem_tiles_flat_test = torch.cat([tile for row in dem_test_tiles for tile in row], dim=0)
+
+# remove any tiles with missing values for training
+clean_prism, clean_era5, clean_dem = remove_tiles(prism_tiles_flat, era5_tiles_flat, dem_tiles_flat)
+
+# make sure number of tiles is a multiple of batch size = 10
+clean_prism = trim_tiles(clean_prism, 10)
+clean_era5 = trim_tiles(clean_era5, 10)
+clean_dem = trim_tiles(clean_dem, 10)
+
+# # replace any NAs in testing tiles with tile mean
+# clean_prism_test = na_to_mean(prism_tiles_flat_test)
+# clean_era5_test = na_to_mean(era5_tiles_flat_test)
+# clean_dem_test = na_to_mean(dem_tiles_flat_test)
+
+# remove any tiles with missing values for testing
+clean_prism_test, clean_era5_test, clean_dem_test = remove_tiles(prism_tiles_flat_test, era5_tiles_flat_test, dem_tiles_flat_test)
+
+torch.save(clean_prism, prism_folder + "prism_tiles.pt")
+torch.save(clean_era5, era5_folder + "era5_tiles.pt")
+torch.save(clean_dem, dem_folder + "dem_tiles.pt")
+
+torch.save(clean_prism_test, prism_folder + "prism_test_tiles.pt")
+torch.save(clean_era5_test, era5_folder + "era5_test_tiles.pt")
+torch.save(clean_dem_test, dem_folder + "dem_test_tiles.pt")
+```
+
+## Load model & predict (done on thufir):
+
+```{python}
+G = torch.jit.load("/sapho/tirion/GANs/generators/full_train_generator_250.pt", map_location=torch.device('cuda:1'))
+device = "cuda:1"
+
+# replace any missing values in tiles with mean value if NAs make it crash?
+era5_tiles_gen = [[ten.unsqueeze(0) for ten in x] for x in era5_tiles]
+dem_tiles_gen = [[ten.unsqueeze(0) for ten in x] for x in dem_tiles]
+
+preds = [[G(era5.to(device).float(),dem.to(device).float()).cpu().detach() for era5, dem in zip(e1,d1)] for e1,d1 in zip(era5_tiles_gen, dem_tiles_gen)]
+```
+
+## Blending (done on thufir):
+
+```{python}
+from torch.nn import functional as nnf
+
+ncol = len(preds)
+nrow = len(preds[0])
+scale_factor = 12
+tile_size = 144
+offset = 108
+pad_size = int((tile_size-offset)/4)
+overlap_size = pad_size * 2
+new_size = tile_size - overlap_size
+pad_size = int((tile_size-offset)/4)
+overlap_size = pad_size * 2
+new_size = tile_size - overlap_size
+
+# crop edges
+pred_crop = [[ten[0,0,pad_size:-pad_size,pad_size:-pad_size] for j,ten in enumerate(x)] for i,x in enumerate(preds)]
+
+# make masks
+t1 = torch.linspace(0,1,overlap_size).repeat(126,1)
+t2 = torch.ones((126,126-(overlap_size*2))) 
+t3 = torch.linspace(1,0,overlap_size).repeat(126,1)
+tile_mask = torch.cat([t1,t2,t3], dim = 1).transpose(0,1)
+
+def blend_row(row_ls):
+  temp = torch.cat([x.reshape(1,new_size**2,1) for x in row_ls],dim = 2)
+  out = nnf.fold(temp, (nrow*offset + overlap_size*2,new_size), kernel_size=(new_size,new_size), stride=offset).squeeze()
+  return out
+
+## mask individual tiles
+mask_tiles = [[ten * tile_mask for ten in x] for x in pred_crop]
+pred_cols = [blend_row(x) for x in mask_tiles]
+
+## make column mask
+col_dims = pred_cols[0].shape
+t1 = torch.linspace(0,1,overlap_size).repeat(col_dims[0],1)
+t2 = torch.ones((col_dims[0],126-(overlap_size*2))) 
+t3 = torch.linspace(1,0,overlap_size).repeat(col_dims[0],1)
+column_mask = torch.cat([t1,t2,t3], dim = 1)
+
+mask_cols = [column_mask * x for x in pred_cols]
+
+##blend and concatenate cols
+temp = [x.reshape(1,col_dims[0]*col_dims[1],1) for x in mask_cols]
+uf = torch.cat(temp, dim = 2)
+raw = nnf.fold(uf, (col_dims[0],ncol*offset + overlap_size*2), kernel_size=col_dims, stride=offset)
+result = raw.squeeze()
+
+plt.close()
+plt.imshow(result)
+plt.show()
+
+final_pad = nnf.pad(result, (pad_size,pad_size,pad_size,pad_size), mode = "constant", value = 0)
+
+plt.close()
+plt.imshow(final_pad)
+plt.show()
+
+torch.save(final_pad, "/sapho/tirion/GANs/results/" + "full_train_generator_250_results.pt")
+```
+
+## Create raster:
+
+```{python}
+final_pad = torch.load("O:/Mosaic_Yukon/Tirion/Results/Run2/alaska_full_region_tmax_mar_generator_250_sd.pt")
+
+res_np = np.array(final_pad)
+
+plt.close()
+plt.imshow(res_np, cmap='RdBu')
+plt.show()
+
+res_np.shape
+```
+
+```{r}
+library(terra)
+library(data.table)
+library(reticulate)
+library(RColorBrewer)
+
+results_folder <- "O:/Mosaic_Yukon/Tirion/Results/Run2/"
+
+#dem_test <- rast(paste(dem_folder, "dem_test_cropped.nc", sep = ""))
+
+res <- dem[[1]]
+rast_dim <- dim(res)
+preds <- py$res_np
+dim(preds)
+
+preds <- preds[1:rast_dim[1],1:rast_dim[2]]
+values(res) <- preds
+plot(res, col = gray.colors(length(values(res))))
+
+# x <- read.csv(paste(data_folder, "standardization.csv", sep=""))
+# 
+# unstand_mean <- x[[3]][1]
+# unstand_std <- x[[4]][1]
+# 
+# res_us <- (res * unstand_std) + (unstand_mean)
+# plot(res_us)
+
+# writeCDF(res, paste0(results_folder, "GAN_gen250_fullregion_sd.nc"), varname='tmax', overwrite = T)
+```
