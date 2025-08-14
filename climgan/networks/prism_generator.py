@@ -53,7 +53,7 @@ class DenseResidualBlockNoise(nn.Module):
     The core module of paper: (Residual Dense Network for Image Super-Resolution, CVPR 18)
     """
 
-    def __init__(self, filters, resolution, res_scale=0.8, noise_sd=1):
+    def __init__(self, filters, resolution, res_scale=0.8, noise_sd=0.1):
         super().__init__()
         self.res_scale = res_scale
         self.resolution = resolution
@@ -198,7 +198,7 @@ class Generator(nn.Module):
         channels_hr_cov=1,
         n_predictands=1,
         num_res_blocks=14,
-        num_res_blocks_fine=2,
+        num_res_blocks_fine=4,
         num_upsample=3,
     ):
         super().__init__()
@@ -243,11 +243,14 @@ class Generator(nn.Module):
         self.upsampling = nn.Sequential(*upsample_layers)
         # Final output block
         self.conv3 = nn.Sequential(
-            # nn.Conv2d(filters * 2, filters + 1, kernel_size=3, stride=1, padding=1),
-            nn.Conv2d(filters * 2, filters + 1, kernel_size=3, stride=1, padding=1),
-            ResidualInResidualDenseBlock(filters + 1, noise =False, resolution=fine_dims),
+            nn.Conv2d(filters * 2, filters * 2, kernel_size=3, stride=1, padding=1),
+            ResidualInResidualDenseBlock(filters * 2, noise =False, resolution=fine_dims),
+            ResidualInResidualDenseBlock(filters * 2, noise =False, resolution=fine_dims),
+            nn.Conv2d(filters * 2, filters, kernel_size=3, stride=1, padding=1),
+            ResidualInResidualDenseBlock(filters, noise =False, resolution=fine_dims),
+            ResidualInResidualDenseBlock(filters, noise =False, resolution=fine_dims),
             nn.LeakyReLU(),
-            nn.Conv2d(filters + 1, n_predictands, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(filters, n_predictands, kernel_size=3, stride=1, padding=1),
         )
 
         #self.sig = nn.Sigmoid()
