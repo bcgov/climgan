@@ -40,7 +40,7 @@ plot(x = epochs, y = test_metrics[,3], xlab = "# of epochs", ylab = "Wass. dist"
 
 ```{python}
 pred_dir = 'O:/Mosaic_Yukon/Tirion/Results/Run4/GAN_gen250/'
-pred_path = pred_dir + 'Run4_gen250_fullregion.nc'
+pred_path = pred_dir + 'Run4_gen250_testregion.nc'
 truth_dir = 'C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/mar/'
 truth_path = truth_dir + 'prism_train_coarse.nc' 
 
@@ -49,7 +49,7 @@ pred = xr.open_dataset(pred_path)
 truth = xr.open_dataset(truth_path)
 
 # crop truth to the size of pred if needed
-#truth = truth.isel(longitude=slice(0,288))
+truth = truth.isel(longitude=slice(0,288))
 ```
 
 ## Prepare test data (truth):
@@ -94,15 +94,15 @@ dmax = 3
 
 pc1 = ax[0].pcolormesh(truth.longitude, truth.latitude, truth.tmax, vmin=minmin, vmax=maxmax, cmap='viridis', label=r'$m$')
 ax[0].set_title(f'truth', fontsize='medium', loc='center')
-#ax[0].set_ylim(59, 71)
+ax[0].set_ylim(59, 71)
 
 pc2 = ax[1].pcolormesh(pred.longitude, pred.latitude, pred.tmax, vmin=minmin, vmax=maxmax, cmap='viridis', label=r'$m$')
 ax[1].set_title(f'prediction', fontsize='medium', loc='center')
-#ax[1].set_ylim(59, 71)
+ax[1].set_ylim(59, 71)
 
 pc3 = ax[2].pcolormesh(pred.longitude, pred.latitude, truth.tmax.values-pred.tmax.values, vmin=dmin, vmax=dmax, cmap='RdBu', label=r'$m$')
 ax[2].set_title(f'truth-prediction', fontsize='medium', loc='center')
-#ax[2].set_ylim(59, 71)
+ax[2].set_ylim(59, 71)
 
 fig.supylabel('latitude [deg N]')
 fig.supxlabel('longitude [deg E]')
@@ -111,7 +111,7 @@ fig.suptitle(f"March tmax, MAE = %.2f" %MAE)
 
 fig.colorbar(pc1, shrink=0.5, aspect=20, location='bottom', ax=ax[0:2])
 fig.colorbar(pc3, shrink=0.9, aspect=20, location='bottom', ax=ax[2])
-plt.savefig(pred_dir + "pred_PRISM_test_diff_fullarea.png", dpi = 400)
+plt.savefig(pred_dir + "pred_PRISM_test_diff_testarea.png", dpi = 400)
 plt.close()
 ```
 
@@ -122,7 +122,7 @@ Create raster:
 ```{python}
 import matplotlib.patches as patches
 
-final_pad = torch.load("O:/Mosaic_Yukon/Tirion/Results/Run4/GAN_gen250/Run4_gen250_fullregion_setseed.pt")
+final_pad = torch.load("O:/Mosaic_Yukon/Tirion/Results/Run4/GAN_gen250/Run4_gen250_fullregion.pt")
 
 res_np = np.array(final_pad)
 
@@ -137,7 +137,7 @@ ax.add_patch(rect)
 # new_y = pos.y0 + (pos.height - new_height) / 2
 # cbar.ax.set_position([pos.x0, new_y, pos.width, new_height])
 ax.axis('off')
-plt.savefig(pred_dir + "full_map_setseed.png", bbox_inches='tight', dpi=600)
+plt.savefig(pred_dir + "full_map.png", bbox_inches='tight', dpi=600)
 plt.show()
 
 res_np.shape
@@ -197,5 +197,44 @@ dev.off()
 # res_us <- (res * unstand_std) + (unstand_mean)
 # plot(res_us)
 
+# writeCDF(res, paste0(results_folder, "GAN_gen250_fullregion_sd.nc"), varname='tmax', overwrite = T)
+```
+
+## Calculate lag1 pixel-wise correlation:
+
+```{python}
+def lag1(x):
+    """ Lag1 autocorrelation function for each pixel """
+    if np.all(np.isnan(x)):
+        return np.nan
+    x_mean = np.nanmean(x)
+    x0 = x[:-1] - x_mean
+    x1 = x[1:] - x_mean
+    return np.nansum(x0 * x1) / np.nansum(x0**2)
+  
+cur = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/jul/prism_train_coarse.nc"
+prev1 = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/jun/prism_train_coarse.nc"
+prev2 = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/may/prism_train_coarse.nc"
+prev3 = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/apr/prism_train_coarse.nc"
+
+ds_cur  = xr.open_dataset(cur)
+ds_prev1 = xr.open_dataset(prev1)
+ds_prev2 = xr.open_dataset(prev2)
+ds_prev3 = xr.open_dataset(prev3)
+
+data = xr.concat([ds_prev3['tmax'], ds_prev2['tmax'], ds_prev1['tmax'], ds_cur['tmax']], dim="time")
+
+lag1_map = xr.apply_ufunc(
+    lag1,
+    data,
+    input_core_dims=[["time"]],
+    vectorize=True,
+    output_dtypes=[float]
+)
+
+plt.close()
+plt.figure(figsize=(8, 6))
+lag1_map.plot(cmap="coolwarm", vmin=-1, vmax=1)
+plt.show()
 # writeCDF(res, paste0(results_folder, "GAN_gen250_fullregion_sd.nc"), varname='tmax', overwrite = T)
 ```

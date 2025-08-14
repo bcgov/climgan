@@ -217,8 +217,8 @@ prism_tiles = tile_data(prism_cropped.unsqueeze(0), tile_size, offset)
 prism_test_tiles = tile_data(prism_test.unsqueeze(0), tile_size, offset)
 
 ## ERA5
-era5_tiles = tile_data(standardized_era5[[0,1,2,12,13],...], int(tile_size / scale_factor), int(offset / scale_factor))
-era5_test_tiles = tile_data(standardized_era5_test[[0,1,2,12,13],...], int(tile_size / scale_factor), int(offset / scale_factor))
+era5_tiles = tile_data(standardized_era5[[2,12,13],...], int(tile_size / scale_factor), int(offset / scale_factor))
+era5_test_tiles = tile_data(standardized_era5_test[[2,12,13],...], int(tile_size / scale_factor), int(offset / scale_factor))
 
 
 ## DEM
@@ -230,32 +230,29 @@ plt.imshow(prism_tiles[4][8][0,...])
 plt.show()
 
 plt.close()
-plt.imshow(era5_tiles[4][8][0,...]) # jan
+plt.imshow(era5_tiles[4][8][0,...]) # mar
 plt.show()
+
 plt.close()
-plt.imshow(era5_tiles[4][8][1,...]) # feb
+plt.imshow(era5_tiles[4][8][1,...]) # lat
 plt.show()
+
 plt.close()
-plt.imshow(era5_tiles[4][8][2,...]) # mar
+plt.imshow(era5_tiles[4][8][2,...]) # lon
 plt.show()
-plt.close()
-plt.imshow(era5_tiles[4][8][3,...]) # lat
-plt.show()
-plt.close()
-plt.imshow(era5_tiles[4][8][4,...]) # lon
-plt.show()
+
 
 plt.close()
 plt.imshow(dem_tiles[4][8][0,...])
 plt.show()
 
 prism_tiles_flat = torch.cat([tile for row in prism_tiles for tile in row], dim=0)
-# need to use stack here instead of cat because there's 5 channels
+# need to use stack here instead of cat because there's 3 channels
 era5_tiles_flat = torch.stack([tile for row in era5_tiles for tile in row], dim=0)
 dem_tiles_flat = torch.cat([tile for row in dem_tiles for tile in row], dim=0)
 
 prism_tiles_flat_test = torch.cat([tile for row in prism_test_tiles for tile in row], dim=0)
-# need to use stack here instead of cat because there's 5 channels
+# need to use stack here instead of cat because there's 3 channels
 era5_tiles_flat_test = torch.stack([tile for row in era5_test_tiles for tile in row], dim=0)
 dem_tiles_flat_test = torch.cat([tile for row in dem_test_tiles for tile in row], dim=0)
 
@@ -272,6 +269,14 @@ clean_prism_test, clean_era5_test, clean_dem_test = remove_tiles(prism_tiles_fla
 
 # remove any tiles that have any values=0 for testing
 clean_prism_test, clean_era5_test, clean_dem_test = remove_zero_tiles(clean_prism_test, clean_era5_test, clean_dem_test)
+
+# check shapes
+print(clean_prism.shape)
+print(clean_era5.shape)
+print(clean_dem.shape)
+print(clean_prism_test.shape)
+print(clean_era5_test.shape)
+print(clean_dem_test.shape)
 
 torch.save(clean_prism, prism_folder + "prism_tiles.pt")
 torch.save(clean_era5, era5_folder + "era5_tiles.pt")
@@ -361,7 +366,7 @@ torch.save(final_pad, "/sapho/tirion/GANs/results/" + "full_train_generator_250_
 ## Create raster:
 
 ```{python}
-final_pad = torch.load("O:/Mosaic_Yukon/Tirion/Results/Run4/GAN_gen250/Run3_gen250_fullregion.pt")
+final_pad = torch.load("O:/Mosaic_Yukon/Tirion/Results/Run4/GAN_gen250/Run4_gen250_testregion.pt")
 
 res_np = np.array(final_pad)
 
@@ -380,9 +385,9 @@ library(RColorBrewer)
 
 results_folder <- "O:/Mosaic_Yukon/Tirion/Results/Run4/GAN_gen250/"
 
-#dem_test <- rast(paste(dem_folder, "dem_test_cropped.nc", sep = ""))
+dem_test <- rast(paste(dem_folder, "dem_test_cropped.nc", sep = ""))
 
-res <- dem[[1]]
+res <- dem_test[[1]]
 rast_dim <- dim(res)
 preds <- py$res_np
 dim(preds)
@@ -399,5 +404,5 @@ plot(res)
 # res_us <- (res * unstand_std) + (unstand_mean)
 # plot(res_us)
 
-writeCDF(res, paste0(results_folder, "Run4_gen250_fullregion.nc"), varname='tmax', overwrite = T)
+writeCDF(res, paste0(results_folder, "Run4_gen250_testregion.nc"), varname='tmax', overwrite = T)
 ```
