@@ -21,6 +21,11 @@ def gen_grid_images(G, coarse, invariant, real, epoch, train_test):
         coarse[random, ...],
         nrow=5
     )[0, ...]
+    
+    dem = torchvision.utils.make_grid(
+        invariant[random, ...],
+        nrow=5
+    )[0, ...]
 
     fake = torchvision.utils.make_grid(
         fake,
@@ -34,25 +39,30 @@ def gen_grid_images(G, coarse, invariant, real, epoch, train_test):
     )[0, ...]
 
 
-    fig = plt.figure(figsize=(20, 15))
+    fig = plt.figure(figsize=(20, 20))
     fig.suptitle("Training Samples")
 
     # Plot the coarse and fake samples
-    subfigs = fig.subfigures(nrows=3, ncols=1)
+    subfigs = fig.subfigures(nrows=4, ncols=1)
     
     # Coarse Samples
-    subfigs[0].suptitle("Coarse WRF")
+    subfigs[0].suptitle("Coarse ERA5")
     ax = subfigs[0].subplots(1, 1)
     ax.imshow(coarse.cpu().detach(), origin="lower")
+    
+    # DEM
+    subfigs[1].suptitle("HR DEM")
+    ax = subfigs[1].subplots(1, 1)
+    ax.imshow(dem.cpu().detach(), origin="lower")
 
     # Generated fake
-    subfigs[1].suptitle("Generated")
-    ax = subfigs[1].subplots(1, 1)
+    subfigs[2].suptitle("Generated")
+    ax = subfigs[2].subplots(1, 1)
     ax.imshow(fake.cpu().detach(), origin="lower")
 
     # Ground Truth
-    subfigs[2].suptitle("PRISM")
-    ax = subfigs[2].subplots(1, 1)
+    subfigs[3].suptitle("PRISM")
+    ax = subfigs[3].subplots(1, 1)
     ax.imshow(real.cpu().detach(), origin="lower")
 
 
