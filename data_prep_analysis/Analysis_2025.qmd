@@ -212,17 +212,33 @@ def lag1(x):
     x1 = x[1:] - x_mean
     return np.nansum(x0 * x1) / np.nansum(x0**2)
   
-cur = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/jul/prism_train_coarse.nc"
-prev1 = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/jun/prism_train_coarse.nc"
-prev2 = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/may/prism_train_coarse.nc"
-prev3 = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/apr/prism_train_coarse.nc"
+jan = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/jan/prism_train_coarse.nc"
+feb = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/feb/prism_train_coarse.nc"
+mar = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/mar/prism_train_coarse.nc"
+apr = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/apr/prism_train_coarse.nc"
+may = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/may/prism_train_coarse.nc"
+jun = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/jun/prism_train_coarse.nc"
+jul = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/jul/prism_train_coarse.nc"
+aug = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/aug/prism_train_coarse.nc"
+sep = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/sep/prism_train_coarse.nc"
+oct = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/oct/prism_train_coarse.nc"
+nov = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/nov/prism_train_coarse.nc"
+dec = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/dec/prism_train_coarse.nc"
 
-ds_cur  = xr.open_dataset(cur)
-ds_prev1 = xr.open_dataset(prev1)
-ds_prev2 = xr.open_dataset(prev2)
-ds_prev3 = xr.open_dataset(prev3)
+ds1  = xr.open_dataset(jan)
+ds2  = xr.open_dataset(feb)
+ds3  = xr.open_dataset(mar)
+ds4  = xr.open_dataset(apr)
+ds5  = xr.open_dataset(may)
+ds6  = xr.open_dataset(jun)
+ds7  = xr.open_dataset(jul)
+ds8  = xr.open_dataset(aug)
+ds9  = xr.open_dataset(sep)
+ds10  = xr.open_dataset(oct)
+ds11  = xr.open_dataset(nov)
+ds12  = xr.open_dataset(dec)
 
-data = xr.concat([ds_prev3['tmax'], ds_prev2['tmax'], ds_prev1['tmax'], ds_cur['tmax']], dim="time")
+data = xr.concat([ds1['tmax'], ds2['tmax'], ds3['tmax'], ds4['tmax'], ds5['tmax'], ds6['tmax'], ds7['tmax'], ds8['tmax'], ds9['tmax'], ds10['tmax'], ds11['tmax'], ds12['tmax']], dim="time")
 
 lag1_map = xr.apply_ufunc(
     lag1,
@@ -237,4 +253,55 @@ plt.figure(figsize=(8, 6))
 lag1_map.plot(cmap="coolwarm", vmin=-1, vmax=1)
 plt.show()
 # writeCDF(res, paste0(results_folder, "GAN_gen250_fullregion_sd.nc"), varname='tmax', overwrite = T)
+```
+
+## Calculating pixelwise difference:
+
+```{python}
+def calculate_difference(ds1, ds2, var=None):
+    """
+    Calculate pixel-wise difference between two climate maps.
+    """
+    data1 = ds1[var]
+    data2 = ds2[var]
+
+    # Calculate the difference
+    diff = data2 - data1
+
+    return diff
+
+diff1 = calculate_difference(ds1, ds2, 'tmax')
+diff2 = calculate_difference(ds2, ds3, 'tmax')
+diff3 = calculate_difference(ds3, ds4, 'tmax')
+diff4 = calculate_difference(ds4, ds5, 'tmax')
+diff5 = calculate_difference(ds5, ds6, 'tmax')
+diff6 = calculate_difference(ds6, ds7, 'tmax')
+diff7 = calculate_difference(ds7, ds8, 'tmax')
+diff8 = calculate_difference(ds8, ds9, 'tmax')
+diff9 = calculate_difference(ds9, ds10, 'tmax')
+diff10 = calculate_difference(ds10, ds11, 'tmax')
+diff11 = calculate_difference(ds11, ds12, 'tmax')
+
+diffs = [diff1, diff2, diff3, diff4, diff5, diff6, diff7, diff8, diff9, diff10, diff11]
+labels = ["Feb-Jan", "Mar-Feb", "Apr-Mar", "May-Apr", "Jun-May", "Jul-Jun", "Aug-Jul", "Sep-Aug", "Oct-Sep", "Nov-Oct", "Dec-Nov"]
+
+# Create a 3x4 grid
+plt.close()
+fig, axes = plt.subplots(3, 4, figsize=(28, 16))
+axes = axes.flatten()
+
+for ax, diff, label in zip(axes, diffs, labels):
+    diff.plot(ax=ax, cmap='coolwarm', add_colorbar=True)
+    ax.set_title(label)
+    ax.set_xticks([])  # Remove x-axis ticks
+    ax.set_yticks([])  # Remove y-axis ticks
+    ax.set_xlabel('')  # Remove x-axis label
+    ax.set_ylabel('')  # Remove y-axis label
+
+# Turn off the last empty subplot if grid > number of diffs
+for ax in axes[len(diffs):]:
+    ax.axis('off')
+
+plt.subplots_adjust(hspace=1, wspace=.5)
+plt.show()
 ```
