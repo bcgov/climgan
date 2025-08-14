@@ -39,8 +39,8 @@ plot(x = epochs, y = test_metrics[,3], xlab = "# of epochs", ylab = "Wass. dist"
 ## Load data:
 
 ```{python}
-pred_dir = 'O:/Mosaic_Yukon/Tirion/Results/Run2/'
-pred_path = pred_dir + 'GAN_gen90_testregion.nc'
+pred_dir = 'O:/Mosaic_Yukon/Tirion/Results/Run4/GAN_gen250/'
+pred_path = pred_dir + 'Run4_gen250_fullregion.nc'
 truth_dir = 'C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/mar/'
 truth_path = truth_dir + 'prism_train_coarse.nc' 
 
@@ -49,7 +49,7 @@ pred = xr.open_dataset(pred_path)
 truth = xr.open_dataset(truth_path)
 
 # crop truth to the size of pred if needed
-truth = truth.isel(longitude=slice(0,288))
+#truth = truth.isel(longitude=slice(0,288))
 ```
 
 ## Prepare test data (truth):
@@ -94,15 +94,15 @@ dmax = 3
 
 pc1 = ax[0].pcolormesh(truth.longitude, truth.latitude, truth.tmax, vmin=minmin, vmax=maxmax, cmap='viridis', label=r'$m$')
 ax[0].set_title(f'truth', fontsize='medium', loc='center')
-ax[0].set_ylim(59, 71)
+#ax[0].set_ylim(59, 71)
 
 pc2 = ax[1].pcolormesh(pred.longitude, pred.latitude, pred.tmax, vmin=minmin, vmax=maxmax, cmap='viridis', label=r'$m$')
 ax[1].set_title(f'prediction', fontsize='medium', loc='center')
-ax[1].set_ylim(59, 71)
+#ax[1].set_ylim(59, 71)
 
 pc3 = ax[2].pcolormesh(pred.longitude, pred.latitude, truth.tmax.values-pred.tmax.values, vmin=dmin, vmax=dmax, cmap='RdBu', label=r'$m$')
 ax[2].set_title(f'truth-prediction', fontsize='medium', loc='center')
-ax[2].set_ylim(59, 71)
+#ax[2].set_ylim(59, 71)
 
 fig.supylabel('latitude [deg N]')
 fig.supxlabel('longitude [deg E]')
@@ -111,12 +111,91 @@ fig.suptitle(f"March tmax, MAE = %.2f" %MAE)
 
 fig.colorbar(pc1, shrink=0.5, aspect=20, location='bottom', ax=ax[0:2])
 fig.colorbar(pc3, shrink=0.9, aspect=20, location='bottom', ax=ax[2])
-plt.savefig(pred_dir + "pred_PRISM_test_diff.png", dpi = 400)
+plt.savefig(pred_dir + "pred_PRISM_test_diff_fullarea.png", dpi = 400)
 plt.close()
 ```
 
-## Plot standard deviation maps:
+## Plot maps (generated from pred & blending in Pred_2025.qmd):
+
+Create raster:
 
 ```{python}
+import matplotlib.patches as patches
 
+final_pad = torch.load("O:/Mosaic_Yukon/Tirion/Results/Run4/GAN_gen250/Run4_gen250_fullregion_setseed.pt")
+
+res_np = np.array(final_pad)
+
+plt.close()
+fig, ax = plt.subplots()
+im = ax.imshow(res_np)
+rect = patches.Rectangle((0, 0), 288, res_np.shape[0], linewidth=2, edgecolor='black', facecolor='none')
+ax.add_patch(rect)
+# cbar = plt.colorbar(im)
+# pos = cbar.ax.get_position()
+# new_height = pos.height * 0.5
+# new_y = pos.y0 + (pos.height - new_height) / 2
+# cbar.ax.set_position([pos.x0, new_y, pos.width, new_height])
+ax.axis('off')
+plt.savefig(pred_dir + "full_map_setseed.png", bbox_inches='tight', dpi=600)
+plt.show()
+
+res_np.shape
+```
+
+Plot w/ longitude & latitude:
+
+```{r}
+library(terra)
+library(data.table)
+library(reticulate)
+library(RColorBrewer)
+
+results_folder <- "O:/Mosaic_Yukon/Tirion/Results/Run2/GAN_gen250/"
+
+#dem_test <- rast(paste(dem_folder, "dem_test_cropped.nc", sep = ""))
+
+res <- dem[[1]]
+rast_dim <- dim(res)
+preds <- py$res_np
+dim(preds)
+
+preds <- preds[1:rast_dim[1],1:rast_dim[2]]
+values(res) <- preds
+plot(res)
+# add rectangle of test area
+xmax_box <- xmin(res) + 288*xres(res)
+rect(
+  xleft = xmin(res), 
+  ybottom = ymin(res),
+  xright = xmax_box, 
+  ytop = ymax(res),
+  border = "black", 
+  lwd = 2
+)
+
+# save as png
+png(paste0(results_folder, "full_map.png"), width = 1000, height = 600)
+plot(res, asp = 1)
+# add rectangle of test area
+xmax_box <- xmin(res) + 288*xres(res)
+rect(
+  xleft = xmin(res), 
+  ybottom = ymin(res),
+  xright = xmax_box, 
+  ytop = ymax(res),
+  border = "black", 
+  lwd = 2
+)
+dev.off()
+
+# x <- read.csv(paste(data_folder, "standardization.csv", sep=""))
+# 
+# unstand_mean <- x[[3]][1]
+# unstand_std <- x[[4]][1]
+# 
+# res_us <- (res * unstand_std) + (unstand_mean)
+# plot(res_us)
+
+# writeCDF(res, paste0(results_folder, "GAN_gen250_fullregion_sd.nc"), varname='tmax', overwrite = T)
 ```
