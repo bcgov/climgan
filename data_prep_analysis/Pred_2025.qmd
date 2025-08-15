@@ -45,7 +45,7 @@ plot(prism)
 ```
 
 ```{python}
-def slice_map(dataset, num_pixels, save_path_train=None, save_path_test=None, include_coords=False):
+def slice_map(dataset, num_pixels, include_coords=False):
   """ function to slice out an area defined by num of pixels from the left """
   array = dataset.to_array()
   dim = array.dims[-1]
@@ -76,12 +76,6 @@ def slice_map(dataset, num_pixels, save_path_train=None, save_path_test=None, in
     
     cropped = torch.cat([cropped, lat_cropped_tensor, lon_cropped_tensor], dim=0)
     test = torch.cat([test, lat_test_tensor, lon_test_tensor], dim=0)
-    
-  # save the cropped maps for later comparison if needed
-  if save_path_train:
-        torch.save(cropped, save_path_train)
-  if save_path_test:
-        torch.save(test, save_path_test)
 
   return cropped, test
 
@@ -104,7 +98,7 @@ era5_fields = xr.open_dataset(era5_folder + "tasmax_1981_2010_cropped.nc")
 #era5 = torch.from_numpy(era5_fields.to_array().to_numpy())[0,...]
 
 # chop a slice of Alaska ERA5 off and save as testing data
-era5_cropped, era5_test = slice_map(era5_fields, 24, era5_folder + "era5_tasmax_train_cropped.pt", era5_folder + "era5_tasmax_test_cropped.pt", True)
+era5_cropped, era5_test = slice_map(era5_fields, 24, True)
 
 # standardize
 standardized_era5, standardized_era5_test, era5_mean, era5_std = standardize(era5_cropped, era5_test)
@@ -117,12 +111,28 @@ plt.close()
 plt.imshow(standardized_era5_test[2]) # by month
 plt.show()
 
+plt.close()
+plt.imshow(standardized_era5[12]) # lat
+plt.show()
+
+plt.close()
+plt.imshow(standardized_era5[13]) # lon
+plt.show()
+
+plt.close()
+plt.imshow(standardized_era5_test[12]) # lat
+plt.show()
+
+plt.close()
+plt.imshow(standardized_era5_test[13]) # lon
+plt.show()
+
 ## PRISM
 prism_fields = xr.open_dataset(prism_folder + "prism_train_coarse.nc")
 #prism = torch.from_numpy(prism_fields.to_array().to_numpy())[0,...]
 
 # chop a slice of Alaska PRISM off and save as testing data
-prism_cropped, prism_test = slice_map(prism_fields, 288, prism_folder + "prism_train_cropped.pt", prism_folder + "prism_test_cropped.pt")
+prism_cropped, prism_test = slice_map(prism_fields, 288)
 
 # standardize - PRISM already standardized
 
@@ -139,7 +149,7 @@ dem_fields = xr.open_dataset(dem_folder + "dem_NWNA_coarse.nc")
 #dem = torch.from_numpy(dem_fields.to_array().to_numpy())[0,...]
 
 # chop a slice of Alaska dem off and save as testing data
-dem_cropped, dem_test = slice_map(dem_fields, 288, dem_folder + "dem_train_cropped.pt", dem_folder + "dem_test_cropped.pt")
+dem_cropped, dem_test = slice_map(dem_fields, 288)
 
 # standardize
 standardized_dem, standardized_dem_test, dem_mean, dem_std = standardize(dem_cropped, dem_test)
@@ -180,6 +190,15 @@ def remove_tiles(prism, era5, dem):
   clean_dem = dem[~bad_tiles]
   return clean_prism, clean_era5, clean_dem
 
+def remove_zero_tiles(prism, era5, dem):
+  assert prism.size(0) == era5.size(0) == dem.size(0), "Tensors must be same size"
+  zero_mask = (prism == 0).view(prism.size(0), -1).any(dim=1)
+  clean_prism = prism[~zero_mask]
+  clean_era5 = era5[~zero_mask]
+  clean_dem = dem[~zero_mask]
+  return clean_prism, clean_era5, clean_dem
+
+
 def trim_tiles(tiles, batch_size):
   num_tiles = tiles.shape[0]
   remainder = num_tiles % batch_size
@@ -187,43 +206,6 @@ def trim_tiles(tiles, batch_size):
   if remainder != 0:
       tiles = tiles[:-remainder]
   
-  return tiles
-
-import torch
-
-def na_to_mean(tiles):
-    """Only pass in a tensor in shape [numtiles, dim, dim]"""
-    return torch.stack([
-        torch.where(
-            torch.isnan(tile),
-            torch.full_like(
-                tile,
-                tile[~torch.isnan(tile)].mean() if torch.any(~torch.isnan(tile)) else 0.0
-            ),
-            tile
-        )
-        for tile in tiles
-    ])
-    
-def add_covariates_era5(months, tensor):
-  """ add specified months and lat/long layers to tensor """
-  tiles_per_month = []
-
-  for m in months:
-      tiles = tile_data(tensor[m].unsqueeze(0), int(tile_size / scale_factor), int(offset / scale_factor))
-      
-      plt.close()
-      plt.imshow(tiles[4][8][0,...])
-      plt.show()
-
-      # Flatten tile list-of-lists
-      flat_tiled = [tile for row in tiles for tile in row]
-      tiles_per_month.append(flat_tiled)
-
-  tiles = torch.stack([
-      torch.cat([tiles_per_month[m][i] for m in range(len(months))], dim=0)
-      for i in range(len(tiles_per_month[0]))
-])
   return tiles
     
 scale_factor = 12
@@ -235,11 +217,9 @@ prism_tiles = tile_data(prism_cropped.unsqueeze(0), tile_size, offset)
 prism_test_tiles = tile_data(prism_test.unsqueeze(0), tile_size, offset)
 
 ## ERA5
-# era5_tiles = tile_data(standardized_era5[2].unsqueeze(0), int(tile_size / scale_factor), int(offset / scale_factor))
-# era5_test_tiles = tile_data(standardized_era5_test[2].unsqueeze(0), int(tile_size / scale_factor), int(offset / scale_factor))
+era5_tiles = tile_data(standardized_era5[[2,12,13],...], int(tile_size / scale_factor), int(offset / scale_factor))
+era5_test_tiles = tile_data(standardized_era5_test[[2,12,13],...], int(tile_size / scale_factor), int(offset / scale_factor))
 
-era5_tiles = add_covariates_era5([0,1,2,12,13], standardized_era5)
-era5_test_tiles = add_covariates_era5([0,1,2,12,13], standardized_era5_test)
 
 ## DEM
 dem_tiles = tile_data(standardized_dem.unsqueeze(0), tile_size, offset)
@@ -249,22 +229,31 @@ plt.close()
 plt.imshow(prism_tiles[4][8][0,...])
 plt.show()
 
-# plt.close()
-# plt.imshow(era5_tiles[4][8][0,...])
-# plt.show()
+plt.close()
+plt.imshow(era5_tiles[4][8][0,...]) # mar
+plt.show()
+
+plt.close()
+plt.imshow(era5_tiles[4][8][1,...]) # lat
+plt.show()
+
+plt.close()
+plt.imshow(era5_tiles[4][8][2,...]) # lon
+plt.show()
+
 
 plt.close()
 plt.imshow(dem_tiles[4][8][0,...])
 plt.show()
 
 prism_tiles_flat = torch.cat([tile for row in prism_tiles for tile in row], dim=0)
-# era5_tiles_flat = torch.cat([tile for row in era5_tiles for tile in row], dim=0)
-era5_tiles_flat = era5_tiles
+# need to use stack here instead of cat because there's 3 channels
+era5_tiles_flat = torch.stack([tile for row in era5_tiles for tile in row], dim=0)
 dem_tiles_flat = torch.cat([tile for row in dem_tiles for tile in row], dim=0)
 
 prism_tiles_flat_test = torch.cat([tile for row in prism_test_tiles for tile in row], dim=0)
-# era5_tiles_flat_test = torch.cat([tile for row in era5_test_tiles for tile in row], dim=0)
-era5_tiles_flat_test = era5_test_tiles
+# need to use stack here instead of cat because there's 3 channels
+era5_tiles_flat_test = torch.stack([tile for row in era5_test_tiles for tile in row], dim=0)
 dem_tiles_flat_test = torch.cat([tile for row in dem_test_tiles for tile in row], dim=0)
 
 # remove any tiles with missing values for training
@@ -275,13 +264,19 @@ clean_prism = trim_tiles(clean_prism, 10)
 clean_era5 = trim_tiles(clean_era5, 10)
 clean_dem = trim_tiles(clean_dem, 10)
 
-# # replace any NAs in testing tiles with tile mean
-# clean_prism_test = na_to_mean(prism_tiles_flat_test)
-# clean_era5_test = na_to_mean(era5_tiles_flat_test)
-# clean_dem_test = na_to_mean(dem_tiles_flat_test)
-
 # remove any tiles with missing values for testing
 clean_prism_test, clean_era5_test, clean_dem_test = remove_tiles(prism_tiles_flat_test, era5_tiles_flat_test, dem_tiles_flat_test)
+
+# remove any tiles that have any values=0 for testing
+clean_prism_test, clean_era5_test, clean_dem_test = remove_zero_tiles(clean_prism_test, clean_era5_test, clean_dem_test)
+
+# check shapes
+print(clean_prism.shape)
+print(clean_era5.shape)
+print(clean_dem.shape)
+print(clean_prism_test.shape)
+print(clean_era5_test.shape)
+print(clean_dem_test.shape)
 
 torch.save(clean_prism, prism_folder + "prism_tiles.pt")
 torch.save(clean_era5, era5_folder + "era5_tiles.pt")
@@ -371,12 +366,12 @@ torch.save(final_pad, "/sapho/tirion/GANs/results/" + "full_train_generator_250_
 ## Create raster:
 
 ```{python}
-final_pad = torch.load("O:/Mosaic_Yukon/Tirion/Results/Run2/alaska_full_region_tmax_mar_generator_250_sd.pt")
+final_pad = torch.load("O:/Mosaic_Yukon/Tirion/Results/Run4/GAN_gen250/Run4_gen250_testregion.pt")
 
 res_np = np.array(final_pad)
 
 plt.close()
-plt.imshow(res_np, cmap='RdBu')
+plt.imshow(res_np)
 plt.show()
 
 res_np.shape
@@ -388,18 +383,18 @@ library(data.table)
 library(reticulate)
 library(RColorBrewer)
 
-results_folder <- "O:/Mosaic_Yukon/Tirion/Results/Run2/"
+results_folder <- "O:/Mosaic_Yukon/Tirion/Results/Run4/GAN_gen250/"
 
-#dem_test <- rast(paste(dem_folder, "dem_test_cropped.nc", sep = ""))
+dem_test <- rast(paste(dem_folder, "dem_test_cropped.nc", sep = ""))
 
-res <- dem[[1]]
+res <- dem_test[[1]]
 rast_dim <- dim(res)
 preds <- py$res_np
 dim(preds)
 
 preds <- preds[1:rast_dim[1],1:rast_dim[2]]
 values(res) <- preds
-plot(res, col = gray.colors(length(values(res))))
+plot(res)
 
 # x <- read.csv(paste(data_folder, "standardization.csv", sep=""))
 # 
@@ -409,5 +404,5 @@ plot(res, col = gray.colors(length(values(res))))
 # res_us <- (res * unstand_std) + (unstand_mean)
 # plot(res_us)
 
-# writeCDF(res, paste0(results_folder, "GAN_gen250_fullregion_sd.nc"), varname='tmax', overwrite = T)
+writeCDF(res, paste0(results_folder, "Run4_gen250_testregion.nc"), varname='tmax', overwrite = T)
 ```
