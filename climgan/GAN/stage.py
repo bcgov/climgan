@@ -1,7 +1,7 @@
 # Begin - load the data and initiate training
 # Defines the hyperparameter and constants configurationsimport gc
 from climgan.networks.prism_generator import Generator
-from climgan.networks.critic_covariates import Critic
+from climgan.networks.critic import Critic
 from climgan.GAN.dataloader import NetCDFSR
 import climgan.mlflow_tools.mlflow_utils as mlf 
 import climgan.config.hyperparams as hp
@@ -54,7 +54,7 @@ class StageData:
         print("Network dimensions: ")
         print("Fine: ", self.fine_dim_n, "x", self.n_predictands)
         print("Coarse: ", self.coarse_dim_n, "x", self.n_covariates)
-        self.critic = Critic(self.coarse_dim_n, self.fine_dim_n,self.n_covariates, self.n_predictands, self.n_hrcov).to(config.device)
+        self.critic = Critic(self.coarse_dim_n, self.fine_dim_n, self.n_predictands).to(config.device)
         self.generator = Generator(self.coarse_dim_n, self.fine_dim_n, self.n_covariates, self.n_hrcov, self.n_predictands).to(config.device)
 
         # Define optimizers
