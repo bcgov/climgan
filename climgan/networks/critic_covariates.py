@@ -22,7 +22,7 @@ class Critic(nn.Module):
         self.features_hr = nn.Sequential(
             nn.Conv2d(
                 self.nc_HR + inv_dim, self.coarse_dim, kernel_size=3, stride=1, padding=1
-            ),  # input is 144x144
+            ),  # input is 96
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             nn.Conv2d(
                 #int(self.coarse_dim*4),
@@ -32,8 +32,7 @@ class Critic(nn.Module):
                 stride=2,
                 padding=1,
                 bias=False,
-            ),  # state size. 72
-            #nn.LayerNorm([self.coarse_dim, 64, 64]),
+            ),  # state size. 48
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             nn.Conv2d(
                 self.coarse_dim,
@@ -51,8 +50,7 @@ class Critic(nn.Module):
                 stride=2,
                 padding=1,
                 bias=False,
-            ),  # state size. 36
-            #nn.LayerNorm([2 * self.coarse_dim, 32, 32]),
+            ),  # state size. 24
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             nn.Conv2d(
                 2 * self.coarse_dim,
@@ -70,7 +68,7 @@ class Critic(nn.Module):
                 stride=2,
                 padding=1,
                 bias=False,
-            ),  # state size. 18
+            ),  # state size. 12
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             nn.Conv2d(
                 4 * self.coarse_dim,
@@ -88,7 +86,7 @@ class Critic(nn.Module):
                 stride=3,
                 padding=1,
                 bias=False,
-            ),  #state size: 6x6
+            ),  #state size: 4x4
             #nn.LayerNorm([8 * self.coarse_dim, 8, 8]),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             # nn.Conv2d(8*self.coarse_dim, 16*self.coarse_dim, kernel_size=3, stride=1, padding=1, bias=False),  # state size. (512) x 6 x 6
@@ -100,7 +98,7 @@ class Critic(nn.Module):
         self.features_lr = nn.Sequential(
             nn.Conv2d(
                 self.nc_LR, self.coarse_dim, kernel_size=3, stride=1, padding=1
-            ),  # input is 12 x 12
+            ),  # input is 8x8
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             nn.Conv2d(
                 self.coarse_dim,
@@ -118,7 +116,7 @@ class Critic(nn.Module):
                 stride=2,
                 padding=1,
                 bias=False,
-            ),  # state size. 6
+            ),  # state size. 4
             #nn.LayerNorm([2 * self.coarse_dim, 32, 32]),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
         )
@@ -135,7 +133,7 @@ class Critic(nn.Module):
         )
 
         self.classifier = nn.Sequential(
-            nn.Linear(int((6*6)*(12*12)), 100),
+            nn.Linear(int((4*4)*(12*12)), 100),
             # nn.Linear(32*24 * self.coarse_dim, 100),
             #nn.Linear(int(221184), 100),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
