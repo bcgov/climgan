@@ -39,8 +39,8 @@ plot(x = epochs, y = test_metrics[,3], xlab = "# of epochs", ylab = "Wass. dist"
 ## Load data:
 
 ```{python}
-pred_dir = 'O:/Mosaic_Yukon/Tirion/Results/Run4/GAN_gen250/'
-pred_path = pred_dir + 'Run4_gen250_testregion.nc'
+pred_dir = 'O:/Mosaic_Yukon/Tirion/Results/Run5/GAN_gen250/'
+pred_path = pred_dir + 'Run5_gen250_fullregion.nc'
 truth_dir = 'C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/mar/'
 truth_path = truth_dir + 'prism_train_coarse.nc' 
 
@@ -49,7 +49,7 @@ pred = xr.open_dataset(pred_path)
 truth = xr.open_dataset(truth_path)
 
 # crop truth to the size of pred if needed
-truth = truth.isel(longitude=slice(0,288))
+#truth = truth.isel(longitude=slice(0,288))
 ```
 
 ## Prepare test data (truth):
@@ -59,9 +59,9 @@ truth = truth.isel(longitude=slice(0,288))
 stand = pd.read_csv(truth_dir + 'standardization.csv')
 #stand
 
-# mean = stand['mean'][0]
-# std = stand['std'][0]
-# truth['tmax'] = (truth.tmax*std)+mean
+mean = stand['mean'][0]
+std = stand['std'][0]
+truth['tmax'] = (truth.tmax*std)+mean
 
 # change pred longitude to degrees E to match truth
 pred = pred.assign_coords(longitude=pred.longitude % 360)
@@ -89,20 +89,20 @@ fig, ax = plt.subplots(1, 3, layout='constrained', figsize=(10, 5), sharex=True,
 minmin = np.min(truth.tmax)
 maxmax = np.max(truth.tmax)
 # precip (30), temp max (3)
-dmin = -3
-dmax = 3
+dmin = -10
+dmax = 10
 
 pc1 = ax[0].pcolormesh(truth.longitude, truth.latitude, truth.tmax, vmin=minmin, vmax=maxmax, cmap='viridis', label=r'$m$')
 ax[0].set_title(f'truth', fontsize='medium', loc='center')
-ax[0].set_ylim(59, 71)
+#ax[0].set_ylim(59, 71)
 
 pc2 = ax[1].pcolormesh(pred.longitude, pred.latitude, pred.tmax, vmin=minmin, vmax=maxmax, cmap='viridis', label=r'$m$')
 ax[1].set_title(f'prediction', fontsize='medium', loc='center')
-ax[1].set_ylim(59, 71)
+#ax[1].set_ylim(59, 71)
 
 pc3 = ax[2].pcolormesh(pred.longitude, pred.latitude, truth.tmax.values-pred.tmax.values, vmin=dmin, vmax=dmax, cmap='RdBu', label=r'$m$')
 ax[2].set_title(f'truth-prediction', fontsize='medium', loc='center')
-ax[2].set_ylim(59, 71)
+#ax[2].set_ylim(59, 71)
 
 fig.supylabel('latitude [deg N]')
 fig.supxlabel('longitude [deg E]')
@@ -111,7 +111,7 @@ fig.suptitle(f"March tmax, MAE = %.2f" %MAE)
 
 fig.colorbar(pc1, shrink=0.5, aspect=20, location='bottom', ax=ax[0:2])
 fig.colorbar(pc3, shrink=0.9, aspect=20, location='bottom', ax=ax[2])
-plt.savefig(pred_dir + "pred_PRISM_test_diff_testarea.png", dpi = 400)
+plt.savefig(pred_dir + "pred_PRISM_test_diff_fullarea.png", dpi = 400)
 plt.close()
 ```
 
@@ -212,96 +212,105 @@ def lag1(x):
     x1 = x[1:] - x_mean
     return np.nansum(x0 * x1) / np.nansum(x0**2)
   
-jan = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/jan/prism_train_coarse.nc"
-feb = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/feb/prism_train_coarse.nc"
-mar = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/mar/prism_train_coarse.nc"
-apr = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/apr/prism_train_coarse.nc"
-may = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/may/prism_train_coarse.nc"
-jun = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/jun/prism_train_coarse.nc"
-jul = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/jul/prism_train_coarse.nc"
-aug = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/aug/prism_train_coarse.nc"
-sep = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/sep/prism_train_coarse.nc"
-oct = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/oct/prism_train_coarse.nc"
-nov = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/nov/prism_train_coarse.nc"
-dec = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/dec/prism_train_coarse.nc"
+months = ["dec", "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov"]
 
-ds1  = xr.open_dataset(jan)
-ds2  = xr.open_dataset(feb)
-ds3  = xr.open_dataset(mar)
-ds4  = xr.open_dataset(apr)
-ds5  = xr.open_dataset(may)
-ds6  = xr.open_dataset(jun)
-ds7  = xr.open_dataset(jul)
-ds8  = xr.open_dataset(aug)
-ds9  = xr.open_dataset(sep)
-ds10  = xr.open_dataset(oct)
-ds11  = xr.open_dataset(nov)
-ds12  = xr.open_dataset(dec)
+base_path = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax"
 
-data = xr.concat([ds1['tmax'], ds2['tmax'], ds3['tmax'], ds4['tmax'], ds5['tmax'], ds6['tmax'], ds7['tmax'], ds8['tmax'], ds9['tmax'], ds10['tmax'], ds11['tmax'], ds12['tmax']], dim="time")
+datasets = []
 
-lag1_map = xr.apply_ufunc(
+for month in months:
+    nc_path = f"{base_path}/{month}/prism_train_coarse.nc"
+    csv_path = f"{base_path}/{month}/standardization.csv"
+
+    ds = xr.open_dataset(nc_path)
+
+    stand = pd.read_csv(csv_path)
+    mean = stand['mean'][0]
+    std = stand['std'][0]
+
+    ds['tmax'] = (ds['tmax'] * std) + mean
+
+    datasets.append(ds['tmax'])
+
+data_wt = xr.concat(datasets[0:2], dim="time")
+data_sp = xr.concat(datasets[3:5], dim="time")
+data_sm = xr.concat(datasets[6:8], dim="time")
+data_at = xr.concat(datasets[9:11], dim="time")
+
+lag1_map_wt = xr.apply_ufunc(
     lag1,
-    data,
+    data_wt,
     input_core_dims=[["time"]],
     vectorize=True,
     output_dtypes=[float]
 )
 
-plt.close()
-plt.figure(figsize=(8, 6))
-lag1_map.plot(cmap="coolwarm", vmin=-1, vmax=1)
+lag1_map_sp = xr.apply_ufunc(
+    lag1,
+    data_sp,
+    input_core_dims=[["time"]],
+    vectorize=True,
+    output_dtypes=[float]
+)
+
+lag1_map_sm = xr.apply_ufunc(
+    lag1,
+    data_sm,
+    input_core_dims=[["time"]],
+    vectorize=True,
+    output_dtypes=[float]
+)
+
+lag1_map_at = xr.apply_ufunc(
+    lag1,
+    data_at,
+    input_core_dims=[["time"]],
+    vectorize=True,
+    output_dtypes=[float]
+)
+
+maps = [lag1_map_wt, lag1_map_sp, lag1_map_sm, lag1_map_at]
+titles = ["Winter", "Spring", "Summer", "Autumn"]
+
+fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+axes = axes.flatten()
+
+for ax, data, title in zip(axes, maps, titles):
+    data.plot(ax=ax, cmap="coolwarm", vmin=-1, vmax=1, add_colorbar=True)
+    ax.set_title(title)
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+plt.tight_layout()
 plt.show()
 # writeCDF(res, paste0(results_folder, "GAN_gen250_fullregion_sd.nc"), varname='tmax', overwrite = T)
 ```
 
-## Calculating pixelwise difference:
+## Calculate pixel-wise difference:
 
 ```{python}
-def calculate_difference(ds1, ds2, var=None):
-    """
-    Calculate pixel-wise difference between two climate maps.
-    """
-    data1 = ds1[var]
-    data2 = ds2[var]
+diffs = [datasets[i+1] - datasets[i] for i in range(len(datasets) - 1)]
 
-    # Calculate the difference
-    diff = data2 - data1
-
-    return diff
-
-diff1 = calculate_difference(ds1, ds2, 'tmax')
-diff2 = calculate_difference(ds2, ds3, 'tmax')
-diff3 = calculate_difference(ds3, ds4, 'tmax')
-diff4 = calculate_difference(ds4, ds5, 'tmax')
-diff5 = calculate_difference(ds5, ds6, 'tmax')
-diff6 = calculate_difference(ds6, ds7, 'tmax')
-diff7 = calculate_difference(ds7, ds8, 'tmax')
-diff8 = calculate_difference(ds8, ds9, 'tmax')
-diff9 = calculate_difference(ds9, ds10, 'tmax')
-diff10 = calculate_difference(ds10, ds11, 'tmax')
-diff11 = calculate_difference(ds11, ds12, 'tmax')
-
-diffs = [diff1, diff2, diff3, diff4, diff5, diff6, diff7, diff8, diff9, diff10, diff11]
 labels = ["Feb-Jan", "Mar-Feb", "Apr-Mar", "May-Apr", "Jun-May", "Jul-Jun", "Aug-Jul", "Sep-Aug", "Oct-Sep", "Nov-Oct", "Dec-Nov"]
 
-# Create a 3x4 grid
 plt.close()
 fig, axes = plt.subplots(3, 4, figsize=(28, 16))
 axes = axes.flatten()
 
 for ax, diff, label in zip(axes, diffs, labels):
     diff.plot(ax=ax, cmap='coolwarm', add_colorbar=True)
-    ax.set_title(label)
-    ax.set_xticks([])  # Remove x-axis ticks
-    ax.set_yticks([])  # Remove y-axis ticks
-    ax.set_xlabel('')  # Remove x-axis label
-    ax.set_ylabel('')  # Remove y-axis label
+    ax.set_title(label, fontsize=12)
+    ax.set_xticks([])  # remove x-axis ticks
+    ax.set_yticks([])  # remove y-axis ticks
+    ax.set_xlabel('')  # remove x-axis label
+    ax.set_ylabel('')  # remove y-axis label
 
 # Turn off the last empty subplot if grid > number of diffs
 for ax in axes[len(diffs):]:
     ax.axis('off')
 
-plt.subplots_adjust(hspace=1, wspace=.5)
+# Adjust spacing: more space between rows and columns
+plt.subplots_adjust(hspace=0.5, wspace=0.75)
+
 plt.show()
 ```

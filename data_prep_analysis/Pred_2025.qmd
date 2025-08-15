@@ -209,7 +209,7 @@ def trim_tiles(tiles, batch_size):
   return tiles
     
 scale_factor = 12
-tile_size = 144
+tile_size = 96
 offset = 12
 
 ## PRISM
@@ -366,7 +366,7 @@ torch.save(final_pad, "/sapho/tirion/GANs/results/" + "full_train_generator_250_
 ## Create raster:
 
 ```{python}
-final_pad = torch.load("O:/Mosaic_Yukon/Tirion/Results/Run4/GAN_gen250/Run4_gen250_testregion.pt")
+final_pad = torch.load("O:/Mosaic_Yukon/Tirion/Results/Run5/GAN_gen250/Run5_gen250_testregion.pt")
 
 res_np = np.array(final_pad)
 
@@ -383,7 +383,9 @@ library(data.table)
 library(reticulate)
 library(RColorBrewer)
 
-results_folder <- "O:/Mosaic_Yukon/Tirion/Results/Run4/GAN_gen250/"
+results_folder <- "O:/Mosaic_Yukon/Tirion/Results/Run5/GAN_gen250/"
+
+data_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/mar/"
 
 dem_test <- rast(paste(dem_folder, "dem_test_cropped.nc", sep = ""))
 
@@ -396,13 +398,13 @@ preds <- preds[1:rast_dim[1],1:rast_dim[2]]
 values(res) <- preds
 plot(res)
 
-# x <- read.csv(paste(data_folder, "standardization.csv", sep=""))
-# 
-# unstand_mean <- x[[3]][1]
-# unstand_std <- x[[4]][1]
-# 
-# res_us <- (res * unstand_std) + (unstand_mean)
-# plot(res_us)
+x <- read.csv(paste(data_folder, "standardization.csv", sep=""))
 
-writeCDF(res, paste0(results_folder, "Run4_gen250_testregion.nc"), varname='tmax', overwrite = T)
+unstand_mean <- x[[3]][1]
+unstand_std <- x[[4]][1]
+
+res_us <- (res * unstand_std) + (unstand_mean)
+plot(res_us)
+
+writeCDF(res_us, paste0(results_folder, "Run5_gen250_testregion.nc"), varname='tmax', overwrite = T)
 ```
