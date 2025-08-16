@@ -122,22 +122,22 @@ Create raster:
 ```{python}
 import matplotlib.patches as patches
 
-final_pad = torch.load("O:/Mosaic_Yukon/Tirion/Results/Run4/GAN_gen250/Run4_gen250_fullregion.pt")
+final_pad = torch.load("O:/Mosaic_Yukon/Tirion/Results/Run5/GAN_gen250/Run5_gen250_fullregion_sd.pt")
 
 res_np = np.array(final_pad)
 
 plt.close()
 fig, ax = plt.subplots()
-im = ax.imshow(res_np)
+im = ax.imshow(res_np, cmap = 'gray_r')
 rect = patches.Rectangle((0, 0), 288, res_np.shape[0], linewidth=2, edgecolor='black', facecolor='none')
 ax.add_patch(rect)
-# cbar = plt.colorbar(im)
-# pos = cbar.ax.get_position()
-# new_height = pos.height * 0.5
-# new_y = pos.y0 + (pos.height - new_height) / 2
-# cbar.ax.set_position([pos.x0, new_y, pos.width, new_height])
+cbar = plt.colorbar(im)
+pos = cbar.ax.get_position()
+new_height = pos.height * 0.5
+new_y = pos.y0 + (pos.height - new_height) / 2
+cbar.ax.set_position([pos.x0, new_y, pos.width, new_height])
 ax.axis('off')
-plt.savefig(pred_dir + "full_map.png", bbox_inches='tight', dpi=600)
+plt.savefig(pred_dir + "sd_map.png", bbox_inches='tight', dpi=600)
 plt.show()
 
 res_np.shape
@@ -212,7 +212,7 @@ def lag1(x):
     x1 = x[1:] - x_mean
     return np.nansum(x0 * x1) / np.nansum(x0**2)
   
-months = ["dec", "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov"]
+months = ["nov", "dec", "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct"]
 
 base_path = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax"
 
@@ -232,22 +232,12 @@ for month in months:
 
     datasets.append(ds['tmax'])
 
-data_wt = xr.concat(datasets[0:2], dim="time")
-data_sp = xr.concat(datasets[3:5], dim="time")
-data_sm = xr.concat(datasets[6:8], dim="time")
-data_at = xr.concat(datasets[9:11], dim="time")
+data_wt = xr.concat(datasets[0:3], dim="time")
+data_sm = xr.concat(datasets[6:9], dim="time")
 
 lag1_map_wt = xr.apply_ufunc(
     lag1,
     data_wt,
-    input_core_dims=[["time"]],
-    vectorize=True,
-    output_dtypes=[float]
-)
-
-lag1_map_sp = xr.apply_ufunc(
-    lag1,
-    data_sp,
     input_core_dims=[["time"]],
     vectorize=True,
     output_dtypes=[float]
@@ -261,18 +251,10 @@ lag1_map_sm = xr.apply_ufunc(
     output_dtypes=[float]
 )
 
-lag1_map_at = xr.apply_ufunc(
-    lag1,
-    data_at,
-    input_core_dims=[["time"]],
-    vectorize=True,
-    output_dtypes=[float]
-)
+maps = [lag1_map_wt, lag1_map_sm]
+titles = ["Winter", "Summer"]
 
-maps = [lag1_map_wt, lag1_map_sp, lag1_map_sm, lag1_map_at]
-titles = ["Winter", "Spring", "Summer", "Autumn"]
-
-fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+fig, axes = plt.subplots(1, 2, figsize=(12, 10))
 axes = axes.flatten()
 
 for ax, data, title in zip(axes, maps, titles):
