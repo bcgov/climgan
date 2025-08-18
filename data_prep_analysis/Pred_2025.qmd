@@ -366,7 +366,7 @@ torch.save(final_pad, "/sapho/tirion/GANs/results/" + "full_train_generator_250_
 ## Create raster:
 
 ```{python}
-final_pad = torch.load("O:/Mosaic_Yukon/Tirion/Results/Run5/GAN_gen250/Run5_gen250_testregion.pt")
+final_pad = torch.load("O:/Mosaic_Yukon/Tirion/Results/Run6/GAN_gen250/Run6_gen250_testregion.pt")
 
 res_np = np.array(final_pad)
 
@@ -383,7 +383,7 @@ library(data.table)
 library(reticulate)
 library(RColorBrewer)
 
-results_folder <- "O:/Mosaic_Yukon/Tirion/Results/Run5/GAN_gen250/"
+results_folder <- "O:/Mosaic_Yukon/Tirion/Results/Run6/GAN_gen250/"
 
 data_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/mar/"
 
@@ -406,5 +406,5 @@ unstand_std <- x[[4]][1]
 res_us <- (res * unstand_std) + (unstand_mean)
 plot(res_us)
 
-writeCDF(res_us, paste0(results_folder, "Run5_gen250_testregion.nc"), varname='tmax', overwrite = T)
+writeCDF(res_us, paste0(results_folder, "Run6_gen250_testregion.nc"), varname='tmax', overwrite = T)
 ```
