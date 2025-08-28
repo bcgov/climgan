@@ -1,0 +1,77 @@
+library(terra)
+library(data.table)
+library(leaflet)
+library(RColorBrewer)
+library(ranger)
+library(rworldmap)
+
+# load ERA5 data
+era5 <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/era5_clim/tasmax/tasmax_1981_2010_cropped.nc")
+mask <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/WorldClim/tmax/mar/worldclim_mask_train.nc")
+mask_cropped <- crop(mask, era5,  snap="in")
+mask_aligned <- resample(mask_cropped, era5, method = "near")
+era5_final <- mask(era5, mask_aligned, maskvalues=0)
+
+# load the PRISM  data for the variable and unstandardize
+prism <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/mar/prism_train_coarse.nc")
+stand <- read.csv("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/mar/standardization.csv")
+mean_val <- stand$mean[1]
+std_val  <- stand$std[1]
+prism_unstd <- prism * std_val + mean_val
+prism_final <- prism_unstd + 273.15 #convert to Kelvin
+
+# load predicted data and unstandardize
+pred <- rast("O:/Mosaic_Yukon/Tirion/Results/Run7/GAN_gen250/Run7_gen250_fullregion_masked.nc")
+pred_final <- pred + 273.15 #convert to Kelvin
+
+# color scheme
+# combined <- c(values(prism), values(era5_final))
+# combined <- combined[is.finite(combined)]
+# inc=diff(range(combined))/500
+# breaks=seq(quantile(combined, 0.005)-inc, quantile(combined, 0.995)+inc, inc)
+# ColScheme <- colorRampPalette(rev(brewer.pal(11, "RdYlBu")))(length(breaks)-1)
+# ColPal <- colorBin(ColScheme, bins=breaks, na.color = "white")
+# ColPal.raster <- colorBin(ColScheme, bins=breaks, na.color = "transparent")
+min_val <- min(
+  min(values(prism_final), na.rm=TRUE),
+  min(values(pred_final), na.rm=TRUE),
+  min(values(era5_final[[3]]), na.rm=TRUE)
+)
+max_val <- max(
+  max(values(prism_final), na.rm=TRUE),
+  max(values(pred_final), na.rm=TRUE),
+  max(values(era5_final[[3]]), na.rm=TRUE)
+)
+col_pal <- colorNumeric(
+  palette = rev(brewer.pal(11, "RdYlBu")),
+  domain = c(min_val, max_val),
+  na.color = "transparent"
+)
+
+# leaflet map
+map <- leaflet() %>%
+  addTiles(group = "basemap") %>%
+  addProviderTiles('Esri.WorldImagery', group = "sat photo") %>%
+  addRasterImage(prism_final, colors = col_pal, opacity = 1, group = "PRISM") %>%
+  addRasterImage(era5_final[[3]], colors = col_pal, opacity = 1, group = "ERA5") %>%
+  addRasterImage(pred_final, colors = col_pal, opacity = 1, group = "PRED GAN250") %>%
+  addLayersControl(
+    overlayGroups = c("PRISM", "ERA5", "PRED GAN250"),
+    options = layersControlOptions(collapsed = FALSE)
+  )
+map
+
+map <- leaflet() %>%
+  addTiles(group = "basemap") %>%
+  addProviderTiles('Esri.WorldImagery', group = "sat photo") %>%
+  addRasterImage(prism, colors = ColPal.raster, opacity = 1, maxBytes = 10653329, group = "PRISM") %>%
+  # addRasterImage(wc, colors = ColPal.raster, opacity = 1, maxBytes = 10653329, group = "WorldClim") %>%
+  # addRasterImage(wc_foc, colors = ColPal.raster, opacity = 1, maxBytes = 10653329, group = "WorldClim foc") %>%
+  # addRasterImage(pred_wc_full, colors = ColPal.raster, opacity = 1, maxBytes = 10653329, group = "GAN WorldClim no focal") %>%
+  # addRasterImage(pred_wc_full2, colors = ColPal.raster, opacity = 1, maxBytes = 10653329, group = "GAN WorldClim nan") %>%
+  # addRasterImage(pred_wc_full3, colors = ColPal.raster, opacity = 1, maxBytes = 10653329, group = "GAN WorldClim focal, nan=0") %>%
+  # addLayersControl(  
+  #   overlayGroups = c("PRISM", "WorldClim", "WorldClim foc", "GAN WorldClim no focal", "GAN WorldClim nan", "GAN WorldClim focal, nan=0"),
+  #   options = layersControlOptions(collapsed = FALSE)
+  # )
+map
