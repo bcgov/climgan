@@ -22,35 +22,39 @@ library(terra)
 ```
 
 ```{r}
-prism_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/mar/"
+prism_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax"
 
 era5_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/era5_clim/tasmax/"
 
-worldclim_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/WorldClim/tmax/mar/"
-
 dem_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/dem/"
 
-dem <- rast(paste(dem_folder, "dem_NWNA_coarse.nc", sep = ""))
+dem <- rast(paste(dem_folder, "dem_NWNA_coarse_test.nc", sep = ""))
 
 plot(dem)
 
-# era5 <- rast(paste(era5_folder, "tasmax_1981_2010_cropped.nc", sep = ""))
-# 
-# plot(era5[[3]]) # by month
+land_mask <- dem > 0  
+plot(land_mask)
 
-worldclim <- rast(paste(worldclim_folder, "worldclim_coarse.nc", sep = ""))
-mask <- rast(paste(worldclim_folder, "worldclim_mask_train.nc", sep = ""))
+era5 <- rast(paste(era5_folder, "tasmax_1981_2010_cropped_test.nc", sep = ""))
 
-plot(worldclim)
-plot(mask)
+plot(era5[[1]]) # by month
 
-prism <- rast(paste(prism_folder, "prism_train_coarse.nc", sep=""))
+#prism <- rast(paste(prism_folder, "prism_train_coarse.nc", sep=""))
 
-#dim(era5)
-dim(worldclim)
-dim(prism)
+months <- c("jan", "feb", "mar", "apr", "may", "jun",
+            "jul", "aug", "sep", "oct", "nov", "dec")
+
+prism_list <- lapply(months, function(m) {
+  rast(file.path(prism_folder, m, "prism_train_coarse_test.nc"))
+})
+names(prism_list) <- paste0("prism_", months)
+
+dim(era5)
+dim(prism_list[[1]])
 dim(dem)
-plot(prism)
+plot(prism_list[[1]])
+
+writeCDF(land_mask, paste0(dem_folder, "dem_mask_test.nc"), varname='tmax', overwrite = T)
 ```
 
 ```{python}
@@ -103,36 +107,33 @@ def standardize(cropped, test):
 
 # load in folders  
 era5_folder = r.era5_folder
-worldclim_folder = r.worldclim_folder
 prism_folder = r.prism_folder
 dem_folder = r.dem_folder
 
-# ## ERA5
-# era5_fields = xr.open_dataset(era5_folder + "tasmax_1981_2010_cropped.nc")
-# #era5 = torch.from_numpy(era5_fields.to_array().to_numpy())[0,...]
-# 
+## ERA5
+era5_fields = xr.open_dataset(era5_folder + "tasmax_1981_2010_cropped_test.nc")
+era5 = torch.from_numpy(era5_fields.to_array().to_numpy())[0,...]
+
+# standardize
+mask = ~torch.isnan(era5)
+era5_mean = era5[mask].mean()
+era5_std = era5[mask].std()
+standardized_era5 = (era5 - era5_mean) / era5_std
+
 # # chop a slice of Alaska ERA5 off and save as testing data
 # era5_cropped, era5_test = slice_map(era5_fields, 24, True)
-# 
+
 # # standardize
 # standardized_era5, standardized_era5_test, era5_mean, era5_std = standardize(era5_cropped, era5_test)
-# 
-# plt.close()
-# plt.imshow(standardized_era5[2]) # by month
-# plt.show()
-# 
+
+plt.close()
+plt.imshow(standardized_era5[0]) # by month
+plt.show()
+
 # plt.close()
 # plt.imshow(standardized_era5_test[2]) # by month
 # plt.show()
-# 
-# plt.close()
-# plt.imshow(standardized_era5[12]) # lat
-# plt.show()
-# 
-# plt.close()
-# plt.imshow(standardized_era5[13]) # lon
-# plt.show()
-# 
+
 # plt.close()
 # plt.imshow(standardized_era5_test[12]) # lat
 # plt.show()
@@ -141,57 +142,55 @@ dem_folder = r.dem_folder
 # plt.imshow(standardized_era5_test[13]) # lon
 # plt.show()
 
-## WorldClim
-worldclim_fields = xr.open_dataset(worldclim_folder + "worldclim_coarse.nc")
-
-# chop a slice of Alaska ERA5 off and save as testing data
-worldclim_cropped, worldclim_test = slice_map(worldclim_fields, 24)
-
-# standardize
-standardized_worldclim, standardized_worldclim_test, worldclim_mean, worldclim_std = standardize(worldclim_cropped, worldclim_test)
-
-plt.close()
-plt.imshow(standardized_worldclim)
-plt.show()
-
-plt.close()
-plt.imshow(standardized_worldclim_test)
-plt.show()
-
 ## PRISM
-prism_fields = xr.open_dataset(prism_folder + "prism_train_coarse.nc")
-#prism = torch.from_numpy(prism_fields.to_array().to_numpy())[0,...]
+months = ["jan", "feb", "mar", "apr", "may", "jun",
+          "jul", "aug", "sep", "oct", "nov", "dec"]
+prism_list = []
 
-# chop a slice of Alaska PRISM off and save as testing data
-prism_cropped, prism_test = slice_map(prism_fields, 288)
+for m in months:
+  prism_fields = xr.open_dataset(prism_folder + "/" + m +"/prism_train_coarse_test.nc")
+  prism = torch.from_numpy(prism_fields.to_array().to_numpy())[0,...]
+  prism_list.append(prism)
+  
+# prism_fields = xr.open_dataset(prism_folder + "prism_train_coarse_test.nc")
+# prism = torch.from_numpy(prism_fields.to_array().to_numpy())[0,...]
+
+# # chop a slice of Alaska PRISM off and save as testing data
+# prism_cropped, prism_test = slice_map(prism_fields, 288)
 
 # standardize - PRISM already standardized
 
 plt.close()
-plt.imshow(prism_cropped)
+plt.imshow(prism_list[0])
 plt.show()
 
-plt.close()
-plt.imshow(prism_test)
-plt.show()
+# plt.close()
+# plt.imshow(prism_test)
+# plt.show()
 
 ## DEM
-dem_fields = xr.open_dataset(dem_folder + "dem_NWNA_coarse.nc")
-#dem = torch.from_numpy(dem_fields.to_array().to_numpy())[0,...]
-
-# chop a slice of Alaska dem off and save as testing data
-dem_cropped, dem_test = slice_map(dem_fields, 288)
+dem_fields = xr.open_dataset(dem_folder + "dem_NWNA_coarse_test.nc")
+dem = torch.from_numpy(dem_fields.to_array().to_numpy())[0,...]
 
 # standardize
-standardized_dem, standardized_dem_test, dem_mean, dem_std = standardize(dem_cropped, dem_test)
+mask = ~torch.isnan(dem)
+dem_mean = dem[mask].mean()
+dem_std = dem[mask].std()
+standardized_dem = (dem - dem_mean) / dem_std
+
+# # chop a slice of Alaska dem off and save as testing data
+# dem_cropped, dem_test = slice_map(dem_fields, 288)
+# 
+# # standardize
+# standardized_dem, standardized_dem_test, dem_mean, dem_std = standardize(dem_cropped, dem_test)
 
 plt.close()
 plt.imshow(standardized_dem)
 plt.show()
 
-plt.close()
-plt.imshow(standardized_dem_test)
-plt.show()
+# plt.close()
+# plt.imshow(standardized_dem_test)
+# plt.show()
 ```
 
 ## Make tiles:
@@ -212,25 +211,22 @@ def tile_data(tensor, tile_size, offset):
   res_pad = [[torch.nn.functional.pad(ten, (0,tile_size-ten.shape[2],0,tile_size - ten.shape[1],0,0), mode = "constant", value = 0) for ten in x] for x in res_ls]
   return(res_pad)
 
-def remove_tiles(hrcov, lrcov, dem):
-  assert hrcov.size(0) == lrcov.size(0) == dem.size(0), "Tensors must be same size"
-  # nan_mask = torch.isnan(hrcov) | torch.isnan(lrcov)
-  # bad_tiles = nan_mask.view(hrcov.size(0), -1).any(dim=1)
-  hrcov_nan = torch.isnan(hrcov).view(hrcov.size(0), -1).any(dim=1)
-  lrcov_nan = torch.isnan(lrcov).view(lrcov.size(0), -1).any(dim=1)
-  bad_tiles = hrcov_nan | lrcov_nan
-  clean_hrcov = hrcov[~bad_tiles]
-  clean_lrcov = lrcov[~bad_tiles]
+def remove_tiles(prism, era5, dem):
+  assert prism.size(0) == era5.size(0) == dem.size(0), "Tensors must be same size"
+  nan_mask = torch.isnan(prism)
+  bad_tiles = nan_mask.view(prism.size(0), -1).any(dim=1)
+  clean_prism = prism[~bad_tiles]
+  clean_era5 = era5[~bad_tiles]
   clean_dem = dem[~bad_tiles]
-  return clean_hrcov, clean_lrcov, clean_dem
+  return clean_prism, clean_era5, clean_dem
 
-def remove_zero_tiles(hrcov, lrcov, dem):
-  assert hrcov.size(0) == lrcov.size(0) == dem.size(0), "Tensors must be same size"
-  zero_mask = (hrcov == 0).view(hrcov.size(0), -1).any(dim=1)
-  clean_hrcov = hrcov[~zero_mask]
-  clean_lrcov = lrcov[~zero_mask]
+def remove_zero_tiles(prism, era5, dem):
+  assert prism.size(0) == era5.size(0) == dem.size(0), "Tensors must be same size"
+  zero_mask = (prism == 0).view(prism.size(0), -1).any(dim=1)
+  clean_prism = prism[~zero_mask]
+  clean_era5 = era5[~zero_mask]
   clean_dem = dem[~zero_mask]
-  return clean_hrcov, clean_lrcov, clean_dem
+  return clean_prism, clean_era5, clean_dem
 
 
 def trim_tiles(tiles, batch_size):
@@ -260,87 +256,84 @@ tile_size = 96
 offset = 12
 
 ## PRISM
-prism_tiles = tile_data(prism_cropped.unsqueeze(0), tile_size, offset)
-prism_test_tiles = tile_data(prism_test.unsqueeze(0), tile_size, offset)
+prism_list_tiles = [tile_data(prism.unsqueeze(0), tile_size, offset) for prism in prism_list]
+# prism_tiles = tile_data(prism.unsqueeze(0), tile_size, offset)
+# prism_test_tiles = tile_data(prism_test.unsqueeze(0), tile_size, offset)
 
-# ## ERA5
-# era5_tiles = tile_data(standardized_era5[[2,12,13],...], int(tile_size / scale_factor), int(offset / scale_factor))
-# era5_test_tiles = tile_data(standardized_era5_test[[2,12,13],...], int(tile_size / scale_factor), int(offset / scale_factor))
-# era5_tiles_rotated = add_rotations(era5_tiles)
-# era5_test_tiles_rotated = add_rotations(era5_test_tiles)
-
-## WorldClim
-worldclim_tiles = tile_data(standardized_worldclim.unsqueeze(0), int(tile_size / scale_factor), int(offset / scale_factor))
-worldclim_test_tiles = tile_data(standardized_worldclim_test.unsqueeze(0), int(tile_size / scale_factor), int(offset / scale_factor))
+## ERA5
+era5_tiles = tile_data(standardized_era5[0:12,...], int(tile_size / scale_factor), int(offset / scale_factor))
+# era5_test_tiles = tile_data(standardized_era5_test[[11,12,13],...], int(tile_size / scale_factor), int(offset / scale_factor))
 
 ## DEM
 dem_tiles = tile_data(standardized_dem.unsqueeze(0), tile_size, offset)
-dem_test_tiles = tile_data(standardized_dem_test.unsqueeze(0), tile_size, offset)
+# dem_test_tiles = tile_data(standardized_dem_test.unsqueeze(0), tile_size, offset)
+
+for num in range(12):
+  plt.close()
+  plt.imshow(prism_list_tiles[num][2][4][0,...])
+  plt.show()
+
+  plt.close()
+  plt.imshow(era5_tiles[2][4][num,...])
+  plt.show()
 
 plt.close()
-plt.imshow(prism_tiles[4][8][0,...])
+plt.imshow(dem_tiles[2][4][0,...])
 plt.show()
 
-plt.close()
-plt.imshow(worldclim_tiles[4][8][0,...]) # mar
-plt.show()
-
-plt.close()
-plt.imshow(dem_tiles[4][8][0,...])
-plt.show()
-
-prism_tiles_flat = torch.cat([tile for row in prism_tiles for tile in row], dim=0)
+flattened_months = []
+for num in range(12):
+  flat = torch.cat([tile for row in prism_list_tiles[num] for tile in row], dim=0)
+  flattened_months.append(flat)
+  
+prism_tiles_flat = torch.stack(flattened_months, dim=1)
+#prism_tiles_flat = torch.cat([tile for row in prism_list_tiles[num] for tile in row], dim=0)
 # need to use stack here instead of cat because there's 3 channels
-# era5_tiles_flat = torch.stack([tile for row in era5_tiles for tile in row], dim=0)
-worldclim_tiles_flat = torch.cat([tile for row in worldclim_tiles for tile in row], dim=0)
+era5_tiles_flat = torch.stack([tile for row in era5_tiles for tile in row], dim=0)
 dem_tiles_flat = torch.cat([tile for row in dem_tiles for tile in row], dim=0)
 
-prism_tiles_flat_test = torch.cat([tile for row in prism_test_tiles for tile in row], dim=0)
-# need to use stack here instead of cat because there's 3 channels
+# prism_tiles_flat_test = torch.cat([tile for row in prism_test_tiles for tile in row], dim=0)
+# # need to use stack here instead of cat because there's 3 channels
 # era5_tiles_flat_test = torch.stack([tile for row in era5_test_tiles for tile in row], dim=0)
-worldclim_tiles_flat_test = torch.cat([tile for row in worldclim_test_tiles for tile in row], dim=0)
-dem_tiles_flat_test = torch.cat([tile for row in dem_test_tiles for tile in row], dim=0)
+# dem_tiles_flat_test = torch.cat([tile for row in dem_test_tiles for tile in row], dim=0)
 
 # remove any tiles with missing values for training
-clean_prism, clean_worldclim, clean_dem = remove_tiles(prism_tiles_flat, worldclim_tiles_flat, dem_tiles_flat)
+clean_prism, clean_era5, clean_dem = remove_tiles(prism_tiles_flat, era5_tiles_flat, dem_tiles_flat)
 
 # make sure number of tiles is a multiple of batch size = 10
-clean_prism = trim_tiles(clean_prism, 10)
-clean_worldclim = trim_tiles(clean_worldclim, 10)
-clean_dem = trim_tiles(clean_dem, 10)
+clean_prism = trim_tiles(clean_prism, 20)
+clean_era5 = trim_tiles(clean_era5, 20)
+clean_dem = trim_tiles(clean_dem, 20)
 
-# remove any tiles with missing values for testing
-clean_prism_test, clean_worldclim_test, clean_dem_test = remove_tiles(prism_tiles_flat_test, worldclim_tiles_flat_test, dem_tiles_flat_test)
-
-# remove any tiles that have any values=0 for testing
-clean_prism_test, clean_worldclim_test, clean_dem_test = remove_zero_tiles(clean_prism_test, clean_worldclim_test, clean_dem_test)
+# # remove any tiles with missing values for testing
+# clean_prism_test, clean_era5_test, clean_dem_test = remove_tiles(prism_tiles_flat_test, era5_tiles_flat_test, dem_tiles_flat_test)
+#
+# # remove any tiles that have any values=0 for testing
+# clean_prism_test, clean_era5_test, clean_dem_test = remove_zero_tiles(clean_prism_test, clean_era5_test, clean_dem_test)
 
 # check shapes
 print(clean_prism.shape)
-print(clean_worldclim.shape)
+print(clean_era5.shape)
 print(clean_dem.shape)
-print(clean_prism_test.shape)
-print(clean_worldclim_test.shape)
-print(clean_dem_test.shape)
+# print(clean_prism_test.shape)
+# print(clean_era5_test.shape)
+# print(clean_dem_test.shape)
 
-torch.save(clean_prism, prism_folder + "prism_tiles.pt")
-torch.save(clean_worldclim, worldclim_folder + "worldclim_tiles.pt")
+# torch.save(clean_prism, prism_folder + "prism_tiles.pt")
 # torch.save(clean_era5, era5_folder + "era5_tiles.pt")
-torch.save(clean_dem, dem_folder + "dem_tiles.pt")
+# torch.save(clean_dem, dem_folder + "dem_tiles.pt")
 
-torch.save(clean_prism_test, prism_folder + "prism_test_tiles.pt")
-torch.save(clean_worldclim_test, worldclim_folder + "worldclim_test_tiles.pt")
+# torch.save(clean_prism_test, prism_folder + "prism_test_tiles.pt")
 # torch.save(clean_era5_test, era5_folder + "era5_test_tiles.pt")
-torch.save(clean_dem_test, dem_folder + "dem_test_tiles.pt")
+# torch.save(clean_dem_test, dem_folder + "dem_test_tiles.pt")
 ```
 
 ## Load model & predict (done on thufir):
 
 ```{python}
-G = torch.jit.load("/sapho/tirion/GANs/generators/full_train_generator_250.pt", map_location=torch.device('cuda:1'))
-device = "cuda:1"
+G = torch.jit.load("C:/Users/TGRICE/OneDrive - Government of BC/Desktop/Generator_250.pt", map_location=torch.device('cpu'))
+device = "cpu"
 
-# replace any missing values in tiles with mean value if NAs make it crash?
 era5_tiles_gen = [[ten.unsqueeze(0) for ten in x] for x in era5_tiles]
 dem_tiles_gen = [[ten.unsqueeze(0) for ten in x] for x in dem_tiles]
 
@@ -413,7 +406,7 @@ torch.save(final_pad, "/sapho/tirion/GANs/results/" + "full_train_generator_250_
 ## Create raster:
 
 ```{python}
-final_pad = torch.load("O:/Mosaic_Yukon/Tirion/Results/Run7/GAN_gen250/Run7_gen250_fullregion_sd.pt")
+final_pad = torch.load("O:/Mosaic_Yukon/Tirion/Results/Run9/tmax/aug/aug_gen150_fullregion.pt")
 
 res_np = np.array(final_pad)
 
@@ -430,9 +423,9 @@ library(data.table)
 library(reticulate)
 library(RColorBrewer)
 
-results_folder <- "O:/Mosaic_Yukon/Tirion/Results/Run7/GAN_gen250/"
+results_folder <- "O:/Mosaic_Yukon/Tirion/Results/Run9/tmax/aug/"
 
-data_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/mar/"
+data_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/aug/"
 
 #dem_test <- rast(paste(dem_folder, "dem_test_cropped.nc", sep = ""))
 
@@ -453,10 +446,8 @@ unstand_std <- x[[4]][1]
 res_us <- (res * unstand_std) + (unstand_mean)
 plot(res_us)
 
-mask_cropped <- crop(mask, res,  snap="in")
-mask_aligned <- resample(mask_cropped, res, method = "near")
-final <- mask(res, mask_aligned, maskvalues=0)
+final <- mask(res_us, land_mask, maskvalues=FALSE)
 plot(final)
 
-writeCDF(final, paste0(results_folder, "Run7_gen250_fullregionsd_masked.nc"), varname='tmax', overwrite = T)
+writeCDF(final, paste0(results_folder, "aug_fullregion_masked.nc"), varname='tmax', overwrite = T)
 ```

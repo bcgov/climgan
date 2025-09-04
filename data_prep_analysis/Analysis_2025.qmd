@@ -26,7 +26,7 @@ library(matrixStats)
 
 ```{r}
 # load data
-test_metrics <- read.csv("C:/Users/TGRICE/Downloads/test_metrics.csv")
+test_metrics <- read.csv("O:/Mosaic_Yukon/Tirion/Results/Run10/test_metrics.csv")
 
 # plot MAE by epochs
 epochs <- seq(0, 250, by=10)
@@ -39,9 +39,9 @@ plot(x = epochs, y = test_metrics[,3], xlab = "# of epochs", ylab = "Wass. dist"
 ## Load data:
 
 ```{python}
-pred_dir = 'O:/Mosaic_Yukon/Tirion/Results/Run7/GAN_gen250/'
-pred_path = pred_dir + 'Run7_gen250_fullregion_masked.nc'
-truth_dir = 'C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/mar/'
+pred_dir = 'O:/Mosaic_Yukon/Tirion/Results/Run9/tmax/aug/'
+pred_path = pred_dir + 'aug_fullregion_masked.nc'
+truth_dir = 'C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/aug/'
 truth_path = truth_dir + 'prism_train_coarse.nc' 
 
 # load GAN predictions and true fields (PRISM) 
@@ -107,7 +107,7 @@ ax[2].set_title(f'truth-prediction', fontsize='medium', loc='center')
 fig.supylabel('latitude [deg N]')
 fig.supxlabel('longitude [deg E]')
 
-fig.suptitle(f"March tmax, MAE = %.2f" %MAE)
+fig.suptitle(f"Aug tmax, MAE = %.2f" %MAE)
 
 fig.colorbar(pc1, shrink=0.5, aspect=20, location='bottom', ax=ax[0:2])
 fig.colorbar(pc3, shrink=0.9, aspect=20, location='bottom', ax=ax[2])
@@ -134,15 +134,15 @@ pred_np = np.array(pred.tmax)
 plt.close()
 fig, ax = plt.subplots()
 im = ax.imshow(pred_np, cmap = 'RdYlBu_r')
-rect = patches.Rectangle((0, 0), 288, pred_np.shape[0], linewidth=2, edgecolor='black', facecolor='none')
-ax.add_patch(rect)
+# rect = patches.Rectangle((0, 0), 288, pred_np.shape[0], linewidth=2, edgecolor='black', facecolor='none')
+# ax.add_patch(rect)
 cbar = plt.colorbar(im)
 pos = cbar.ax.get_position()
 new_height = pos.height * 0.5
 new_y = pos.y0 + (pos.height - new_height) / 2
 cbar.ax.set_position([pos.x0, new_y, pos.width, new_height])
 ax.axis('off')
-plt.savefig(pred_dir + "full_map_masked1.png", bbox_inches='tight', dpi=600)
+plt.savefig(pred_dir + "full_map_masked.png", bbox_inches='tight', dpi=600)
 plt.show()
 
 res_np.shape
