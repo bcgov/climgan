@@ -26,7 +26,7 @@ library(matrixStats)
 
 ```{r}
 # load data
-test_metrics <- read.csv("O:/Mosaic_Yukon/Tirion/Results/Run10/test_metrics.csv")
+test_metrics <- read.csv("O:/Mosaic_Yukon/Tirion/Results/Run12/test_metrics.csv")
 
 # plot MAE by epochs
 epochs <- seq(0, 250, by=10)
@@ -39,10 +39,10 @@ plot(x = epochs, y = test_metrics[,3], xlab = "# of epochs", ylab = "Wass. dist"
 ## Load data:
 
 ```{python}
-pred_dir = 'O:/Mosaic_Yukon/Tirion/Results/Run9/tmax/aug/'
-pred_path = pred_dir + 'aug_fullregion_masked.nc'
-truth_dir = 'C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/aug/'
-truth_path = truth_dir + 'prism_train_coarse.nc' 
+pred_dir = 'O:/Mosaic_Yukon/Tirion/Results/Run12/mar/'
+pred_path = pred_dir + 'mar_fullregion_masked.nc'
+truth_dir = 'C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/mar/'
+truth_path = truth_dir + 'prism_train_coarse_test.nc' 
 
 # load GAN predictions and true fields (PRISM) 
 pred = xr.open_dataset(pred_path)
@@ -107,11 +107,11 @@ ax[2].set_title(f'truth-prediction', fontsize='medium', loc='center')
 fig.supylabel('latitude [deg N]')
 fig.supxlabel('longitude [deg E]')
 
-fig.suptitle(f"Aug tmax, MAE = %.2f" %MAE)
+fig.suptitle(f"Feb tmax, MAE = %.2f" %MAE)
 
 fig.colorbar(pc1, shrink=0.5, aspect=20, location='bottom', ax=ax[0:2])
 fig.colorbar(pc3, shrink=0.9, aspect=20, location='bottom', ax=ax[2])
-plt.savefig(pred_dir + "pred_PRISM_test_diff_fullarea_masked.png", dpi = 400)
+plt.savefig(pred_dir + "pred_PRISM_diff.png", dpi = 400)
 plt.close()
 ```
 
