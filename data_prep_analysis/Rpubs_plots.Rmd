@@ -1,14 +1,9 @@
----
-title: ""
-output: html_document
----
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE)
 ```
 
-## Jan Tmax
-```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.width=30, fig.height=9, out.width="100%"}
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
 library(terra)
 library(data.table)
 library(leaflet)
@@ -17,58 +12,167 @@ library(ranger)
 library(rworldmap)
 
 # load ERA5 data
-era5 <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/era5_clim/tasmax/tasmax_1981_2010_cropped.nc")[[1]]
+era5_apr <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/era5_clim/prec/ppt_1981_2010_cropped.nc")[[4]]
+era5_apr <- log1p(era5_apr)
 mask <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/dem/dem_mask.nc")
-mask_aligned <- resample(mask, era5, method = "near")
-era5_final <- mask(era5, mask_aligned, maskvalues=0)
+mask_aligned <- resample(mask, era5_apr, method = "near")
+era5_apr_final <- mask(era5_apr, mask_aligned, maskvalues=0)
+# era5_mar <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/era5_clim/tasmax/tasmax_1981_2010_cropped.nc")[[3]]
+# era5_mar_final <- mask(era5_mar, mask_aligned, maskvalues=0)
+# era5_apr <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/era5_clim/tasmax/tasmax_1981_2010_cropped.nc")[[4]]
+# era5_apr_final <- mask(era5_apr, mask_aligned, maskvalues=0)
 
-# # load WorldClim data
-# worldclim <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/WorldClim/tmax/mar/worldclim_coarse.nc")
-# stand1 <- read.csv("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/WorldClim/tmax/mar/standardization.csv")
-# mean_val <- stand1$mean[2]
-# std_val  <- stand1$std[2]
-# worldclim_unstd <- worldclim * std_val + mean_val
-# worldclim_final <- worldclim_unstd + 273.15 #convert to Kelvin
+# load Susan's maps
+sbeale_apr <- rast("O:/Mosaic_Yukon/operational/WorldClim/prec/apr/Predictions/GAN_gen150.nc")
+sbeale_apr <- log1p(sbeale_apr)
+# sbeale_feb <- sbeale_feb + 273.15 #convert to Kelvin
+sbeale_apr <- aggregate(sbeale_apr, fact = 3) # coarsen to match my pred resolution
+# sbeale_mar <- rast("O:/Mosaic_Yukon/operational/WorldClim/tmax/mar/Predictions/GAN_tmax_march_focal_nan=0_gen250_crop.nc")
+# sbeale_mar <- sbeale_mar + 273.15 #convert to Kelvin
+# sbeale_mar <- aggregate(sbeale_mar, fact = 3) # coarsen to match my pred resolution
+# sbeale_apr <- rast("O:/Mosaic_Yukon/operational/WorldClim/tmax/apr/Predictions/GAN_gen100.nc")
+# sbeale_apr <- sbeale_apr + 273.15 #convert to Kelvin
+# sbeale_apr <- aggregate(sbeale_apr, fact = 3) # coarsen to match my pred resolution
 
 # load the PRISM  data for the variable and unstandardize
-prism <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/jan/prism_train_coarse.nc")
-stand <- read.csv("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/jan/standardization.csv")
+prism_apr <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/prec/apr/prism_train_coarse.nc")
+stand <- read.csv("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/prec/apr/standardization.csv")
 mean_val <- stand$mean[1]
 std_val  <- stand$std[1]
-prism_unstd <- prism * std_val + mean_val
-prism_final <- prism_unstd + 273.15 #convert to Kelvin
+prism_apr_unstd <- prism_apr * std_val + mean_val
+prism_apr_final <- log1p(prism_apr_unstd)
+# prism_feb_final <- prism_feb_unstd + 273.15 #convert to Kelvin
 
-# load predicted data and unstandardize
-pred <- rast("O:/Mosaic_Yukon/Tirion/Results/Run9/tmax/jan/jan_fullregion_masked.nc")
-pred_final <- pred + 273.15 #convert to Kelvin
+# prism_mar <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/mar/prism_train_coarse.nc")
+# stand <- read.csv("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/mar/standardization.csv")
+# mean_val <- stand$mean[1]
+# std_val  <- stand$std[1]
+# prism_mar_unstd <- prism_mar * std_val + mean_val
+# prism_mar_final <- prism_mar_unstd + 273.15 #convert to Kelvin
 
-min_val <- min(
-  min(values(prism_final), na.rm=TRUE),
-  min(values(pred_final), na.rm=TRUE),
-  min(values(era5_final), na.rm=TRUE)
-)
-max_val <- max(
-  max(values(prism_final), na.rm=TRUE),
-  max(values(pred_final), na.rm=TRUE),
-  max(values(era5_final), na.rm=TRUE)
-)
-col_pal <- colorNumeric(
-  palette = rev(brewer.pal(11, "RdYlBu")),
-  domain = c(min_val, max_val),
-  na.color = "transparent"
-)
+# prism_apr <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/apr/prism_train_coarse.nc")
+# stand <- read.csv("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/apr/standardization.csv")
+# mean_val <- stand$mean[1]
+# std_val  <- stand$std[1]
+# prism_apr_unstd <- prism_apr * std_val + mean_val
+# prism_apr_final <- prism_apr_unstd + 273.15 #convert to Kelvin
+
+# load predicted data
+pred_apr <- rast("O:/Mosaic_Yukon/Tirion/Results/foundational_model/prec/Model1/apr/apr_fullregion_masked.nc")
+pred_apr <- log1p(pred_apr)
+# pred_feb_final250 <- pred_feb + 273.15 #convert to Kelvin
+# pred_feb <- rast("O:/Mosaic_Yukon/Tirion/Results/foundational_model/Model1/feb/specialization1/gen100/feb_fullregion_masked.nc")
+# pred_feb_final100 <- pred_feb + 273.15 #convert to Kelvin
+# pred_mar <- rast("O:/Mosaic_Yukon/Tirion/Results/foundational_model/Model1/mar/specialization1/gen250/mar_fullregion_masked.nc")
+# pred_mar_final250 <- pred_mar + 273.15 #convert to Kelvin
+# pred_mar <- rast("O:/Mosaic_Yukon/Tirion/Results/foundational_model/Model1/mar/specialization1/gen110/mar_fullregion_masked.nc")
+# pred_mar_final110 <- pred_mar + 273.15 #convert to Kelvin
+# pred_apr <- rast("O:/Mosaic_Yukon/Tirion/Results/foundational_model/Model1/apr/specialization1/apr_fullregion_masked.nc")
+# pred_apr_final <- pred_apr + 273.15 #convert to Kelvin
+
+# load predicted fm data
+# fm_feb <- rast("O:/Mosaic_Yukon/Tirion/Results/foundational_model/Model1/feb/feb_fullregion_masked.nc")
+# fm_feb_final <- fm_feb + 273.15 #convert to Kelvin
+# fm_mar <- rast("O:/Mosaic_Yukon/Tirion/Results/foundational_model/Model1/mar/mar_fullregion_masked.nc")
+# fm_mar_final <- fm_mar + 273.15 #convert to Kelvin
+# fm_apr <- rast("O:/Mosaic_Yukon/Tirion/Results/foundational_model/Model1/apr/apr_fullregion_masked.nc")
+# fm_apr_final <- fm_apr + 273.15 #convert to Kelvin
+
+# min_val <- min(
+#   min(values(prism_final), na.rm=TRUE),
+#   min(values(sbeale), na.rm=TRUE),
+#   min(values(pred_final), na.rm=TRUE),
+#   min(values(fm_final), na.rm=TRUE),
+#   min(values(era5_final), na.rm=TRUE)
+# )
+# max_val <- max(
+#   max(values(prism_final), na.rm=TRUE),
+#   max(values(sbeale), na.rm=TRUE),
+#   max(values(pred_final), na.rm=TRUE),
+#   max(values(fm_final), na.rm=TRUE),
+#   max(values(era5_final), na.rm=TRUE)
+# )
+all_values <- c(
+                values(era5_apr_final),
+                #values(era5_mar_final),
+                # values(era5_apr_final),
+                values(sbeale_apr),
+                # values(sbeale_mar),
+                # values(sbeale_apr),
+                values(prism_apr_final),
+                #values(prism_mar_final),
+                # values(prism_apr_final),
+                values(pred_apr)
+                # values(pred_feb_final100)
+                # values(pred_mar_final250),
+                # values(pred_mar_final110)
+                # values(pred_apr_final),
+                # values(fm_feb_final),
+                # values(fm_mar_final),
+                # values(fm_apr_final)
+                )
+
+# min_val <- quantile(all_values, probs = 0.025, na.rm = TRUE)
+# max_val <- quantile(all_values, probs = 0.975, na.rm = TRUE)
+# 
+# col_pal <- colorNumeric(
+#   palette = rev(brewer.pal(11, "RdYlBu")),
+#   domain = c(min_val, max_val),
+#   na.color = "transparent"
+# )
+all_values <- all_values[is.finite(all_values)]
+inc=diff(range(all_values))/500
+breaks=seq(quantile(all_values, 0.005)-inc, quantile(all_values, 0.995)+inc, inc)
+ColScheme <- colorRampPalette(rev(brewer.pal(11, "RdYlBu")))(length(breaks)-1)
+ColPal <- colorBin(ColScheme, bins=breaks, na.color = "white")
+ColPal.raster <- colorBin(ColScheme, bins=breaks, na.color = "transparent")
 
 # leaflet map
 map <- leaflet() %>%
   addTiles(group = "basemap") %>%
   addProviderTiles('Esri.WorldImagery', group = "sat photo") %>%
-  addRasterImage(prism_final, colors = col_pal, opacity = 1, group = "PRISM") %>%
-  addRasterImage(era5_final, colors = col_pal, opacity = 1, group = "ERA5") %>%
-  addRasterImage(pred_final, colors = col_pal, opacity = 1, group = "PRED GAN250") %>%
+  addRasterImage(prism_apr_final, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "APR PRISM") %>%
+  # addRasterImage(prism_mar_final, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "MAR PRISM") %>%
+  # addRasterImage(prism_apr_final, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "APR PRISM") %>%
+  addRasterImage(sbeale_apr, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "APR SBEALE") %>%
+  # addRasterImage(sbeale_mar, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "MAR SBEALE") %>%
+  # addRasterImage(sbeale_apr, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "APR SBEALE") %>%
+  addRasterImage(era5_apr_final, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "APR ERA5") %>%
+  # addRasterImage(era5_mar_final, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "MAR ERA5") %>%
+  # addRasterImage(era5_apr_final, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "APR ERA5") %>%
+  addRasterImage(pred_apr, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "APR PRED G250") %>%
+  # addRasterImage(pred_feb_final100, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "FEB PRED G100 S1") %>%
+  # addRasterImage(pred_mar_final250, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "MAR PRED G250 S1") %>%
+  # addRasterImage(pred_mar_final110, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "MAR PRED G110 S1") %>%
+  # addRasterImage(pred_apr_final, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "APR PRED G250 S1") %>%
+  # addRasterImage(fm_feb_final, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "FEB PRED G250 FM") %>%
+  # addRasterImage(fm_mar_final, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "MAR PRED G250 FM") %>%
+  # addRasterImage(fm_apr_final, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "APR PRED G250 FM") %>%
   addLayersControl(
-    overlayGroups = c("PRISM", "ERA5", "PRED GAN250"),
+    # overlayGroups = c("FEB PRISM", "MAR PRISM", "APR PRISM",
+    #                   "FEB ERA5", "MAR ERA5", "APR ERA5",
+    #                   "FEB PRED G250 S1", "MAR PRED G250 S1", "APR PRED G250 S1",
+    #                   "FEB PRED G250 FM", "MAR PRED G250 FM", "APR PRED G250 FM",
+    #                   "FEB SBEALE", "MAR SBEALE", "APR SBEALE"),
+        overlayGroups = c("APR PRISM",
+                      "APR ERA5",
+                      "APR SBEALE",
+                      "APR PRED G250"),
     options = layersControlOptions(collapsed = FALSE)
   )
 map
+```
+
+```{css, echo=FALSE}
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.leaflet-container {
+  height: 100vh !important;
+  width: 100vw !important;
+}
 ```
 

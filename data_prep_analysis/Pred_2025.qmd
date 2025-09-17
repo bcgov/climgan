@@ -22,39 +22,53 @@ library(terra)
 ```
 
 ```{r}
-prism_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/"
+prism_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/prec/mar/"
 
-era5_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/era5_clim/tasmax/"
+era5_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/era5_clim/prec/"
 
 dem_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/dem/"
 
 dem <- rast(paste(dem_folder, "dem_NWNA_coarse.nc", sep = ""))
 
+# extend dem 1 degree south and add band of zeroes
+extended <- ext(ext(dem)[1], ext(dem)[2], ext(dem)[3] - 1, ext(dem)[4])
+dem_extended <- rast(extended, resolution = res(dem), crs = crs(dem))
+values(dem_extended) <- 0
+dem_extended <- merge(dem, dem_extended)
+# writeCDF(dem_extended, paste0(dem_folder, "dem_pred.nc"), overwrite = TRUE)
+
+
 plot(dem)
+plot(dem_extended)
 
-land_mask <- dem > 0  
-plot(land_mask)
+# land_mask <- dem > 0  
+# plot(land_mask)
 
-era5 <- rast(paste(era5_folder, "tasmax_1981_2010_cropped.nc", sep = ""))
+era5 <- rast(paste(era5_folder, "ppt_1981_2010_cropped.nc", sep = ""))
 
-plot(era5[[1]]) # by month
+plot(era5[[2]]) # by month
 
-#prism <- rast(paste(prism_folder, "prism_train_coarse.nc", sep=""))
+prism <- rast(paste(prism_folder, "prism_train_coarse.nc", sep=""))
 
-months <- c("jan", "feb", "mar", "apr", "may", "jun",
-            "jul", "aug", "sep", "oct", "nov", "dec")
+# ak <- rast(paste(prism_folder, "ak_tmax_1981_2010.03.asc", sep=""))
+# plot(ak)
 
-prism_list <- lapply(months, function(m) {
-  rast(file.path(prism_folder, m, "prism_train_coarse.nc"))
-})
-names(prism_list) <- paste0("prism_", months)
+# months <- c("jan", "feb", "mar", "apr", "may", "jun",
+#             "jul", "aug", "sep", "oct", "nov", "dec")
+# 
+# prism_list <- lapply(months, function(m) {
+#   rast(file.path(prism_folder, m, "prism_train_coarse.nc"))
+# })
+# names(prism_list) <- paste0("prism_", months)
 
 dim(era5)
-dim(prism_list[[1]])
+dim(prism)
 dim(dem)
-plot(prism_list[[1]])
+plot(prism)
 
-writeCDF(land_mask, paste0(dem_folder, "dem_mask.nc"), varname='tmax', overwrite = T)
+sbeale <- rast("O:/Mosaic_Yukon/operational/WorldClim/prec/feb/Predictions/GAN_gen150.nc")
+
+# writeCDF(land_mask, paste0(dem_folder, "dem_mask.nc"), varname='tmax', overwrite = T)
 ```
 
 ```{python}
@@ -112,73 +126,77 @@ dem_folder = r.dem_folder
 
 ## ERA5
 era5_fields = xr.open_dataset(era5_folder + "tasmax_1981_2010_cropped.nc")
-era5 = torch.from_numpy(era5_fields.to_array().to_numpy())[0,...]
-
-# standardize
-mask = ~torch.isnan(era5)
-era5_mean = era5[mask].mean()
-era5_std = era5[mask].std()
-standardized_era5 = (era5 - era5_mean) / era5_std
-
-# # chop a slice of Alaska ERA5 off and save as testing data
-# era5_cropped, era5_test = slice_map(era5_fields, 24)
+# era5 = torch.from_numpy(era5_fields.to_array().to_numpy())[0,...]
 # 
 # # standardize
-# standardized_era5, standardized_era5_test, era5_mean, era5_std = standardize(era5_cropped, era5_test)
+# mask = ~torch.isnan(era5)
+# era5_mean = era5[mask].mean()
+# era5_std = era5[mask].std()
+# standardized_era5 = (era5 - era5_mean) / era5_std
+
+# chop a slice of Alaska ERA5 off and save as testing data
+era5_cropped, era5_test = slice_map(era5_fields, 24)
+
+# standardize
+standardized_era5, standardized_era5_test, era5_mean, era5_std = standardize(era5_cropped, era5_test)
 
 plt.close()
 plt.imshow(standardized_era5[0]) # by month
 plt.show()
 
-# plt.close()
-# plt.imshow(standardized_era5_test[0]) # by month
-# plt.show()
+plt.close()
+plt.imshow(standardized_era5_test[0]) # by month
+plt.show()
 
 ## PRISM
-months = ["jan", "feb", "mar", "apr", "may", "jun",
-          "jul", "aug", "sep", "oct", "nov", "dec"]
-prism_list = []
-
-for m in months:
-  prism_fields = xr.open_dataset(prism_folder + m +"/prism_train_coarse.nc")
-  prism = torch.from_numpy(prism_fields.to_array().to_numpy())[0,...]
-  prism_list.append(prism)
+# months = ["jan", "feb", "mar", "apr", "may", "jun",
+#           "jul", "aug", "sep", "oct", "nov", "dec"]
+# prism_list = []
+# 
+# for m in months:
+#   prism_fields = xr.open_dataset(prism_folder + m +"/prism_train_coarse.nc")
+#   prism = torch.from_numpy(prism_fields.to_array().to_numpy())[0,...]
+#   prism_list.append(prism)
   
-# prism_fields = xr.open_dataset(prism_folder + "prism_train_coarse_test.nc")
+prism_fields = xr.open_dataset(prism_folder + "prism_train_coarse.nc")
 # prism = torch.from_numpy(prism_fields.to_array().to_numpy())[0,...]
 
-# # chop a slice of Alaska PRISM off and save as testing data
-# prism_cropped, prism_test = slice_map(prism_fields, 288)
+# chop a slice of Alaska PRISM off and save as testing data
+prism_cropped, prism_test = slice_map(prism_fields, 288)
 
 # standardize - PRISM already standardized
 
 plt.close()
-plt.imshow(prism_list[0])
+plt.imshow(prism_cropped)
+plt.show()
+
+plt.close()
+plt.imshow(prism_test)
 plt.show()
 
 ## DEM
 dem_fields = xr.open_dataset(dem_folder + "dem_NWNA_coarse.nc")
-dem = torch.from_numpy(dem_fields.to_array().to_numpy())[0,...]
-
-# standardize
-mask = ~torch.isnan(dem)
-dem_mean = dem[mask].mean()
-dem_std = dem[mask].std()
-standardized_dem = (dem - dem_mean) / dem_std
-
-# # chop a slice of Alaska dem off and save as testing data
-# dem_cropped, dem_test = slice_map(dem_fields, 288)
+# dem = torch.from_numpy(dem_fields.to_array().to_numpy())[0,...]
 # 
 # # standardize
-# standardized_dem, standardized_dem_test, dem_mean, dem_std = standardize(dem_cropped, dem_test)
+# mask = ~torch.isnan(dem)
+# dem_mean = dem[mask].mean()
+# dem_std = dem[mask].std()
+# standardized_dem = (dem - dem_mean) / dem_std
+
+# chop a slice of Alaska dem off and save as testing data
+dem_cropped, dem_test = slice_map(dem_fields, 288)
+
+# standardize
+standardized_dem, standardized_dem_test, dem_mean, dem_std = standardize(dem_cropped, dem_test)
 
 plt.close()
 plt.imshow(standardized_dem)
 plt.show()
 
-# plt.close()
-# plt.imshow(standardized_dem_test)
-# plt.show()
+plt.close()
+plt.imshow(standardized_dem_test)
+plt.show()
 ```
 
 ## Make tiles:
@@ -244,57 +262,59 @@ tile_size = 96
 offset = 12
 
 ## PRISM
-prism_list_tiles = [tile_data(prism.unsqueeze(0), tile_size, offset) for prism in prism_list]
-prism_test_tiles = tile_data(prism_list[0].unsqueeze(0), tile_size, offset)
-# prism_tiles = tile_data(prism.unsqueeze(0), tile_size, offset)
-# prism_test_tiles = tile_data(prism_test.unsqueeze(0), tile_size, offset)
+# prism_list_tiles = [tile_data(prism.unsqueeze(0), tile_size, offset) for prism in prism_list]
+# prism_test_tiles = tile_data(prism_list[0].unsqueeze(0), tile_size, offset)
+prism_tiles = tile_data(prism_cropped.unsqueeze(0), tile_size, offset)
+prism_test_tiles = tile_data(prism_test.unsqueeze(0), tile_size, offset)
 
 ## ERA5
-seqs = []
-for i in range(12):
-    seq = [i] + [x for x in range(12) if x != i]
-    seqs.append(seq)
-    
-era5_list_tiles = [tile_data(standardized_era5[seq,...], int(tile_size / scale_factor), int(offset / scale_factor)) for seq in seqs]
-era5_test_tiles = tile_data(standardized_era5[[0],...], int(tile_size / scale_factor), int(offset / scale_factor))
+# seqs = []
+# for i in range(12):
+#     seq = [i] + [x for x in range(12) if x != i]
+#     seqs.append(seq)
+#     
+# era5_list_tiles = [tile_data(standardized_era5[seq,...], int(tile_size / scale_factor), int(offset / scale_factor)) for seq in seqs]
+# era5_test_tiles = tile_data(standardized_era5[[0],...], int(tile_size / scale_factor), int(offset / scale_factor))
+era5_tiles = tile_data(standardized_era5[[3,0,1,2,4,5,6,7,8,9,10,11],...], int(tile_size / scale_factor), int(offset / scale_factor))
+era5_test_tiles = tile_data(standardized_era5_test[[3,0,1,2,4,5,6,7,8,9,10,11],...], int(tile_size / scale_factor), int(offset / scale_factor))
 
 ## DEM
 dem_tiles = tile_data(standardized_dem.unsqueeze(0), tile_size, offset)
-dem_test_tiles = tile_data(standardized_dem.unsqueeze(0), tile_size, offset)
+dem_test_tiles = tile_data(standardized_dem_test.unsqueeze(0), tile_size, offset)
 
+plt.close()
+plt.imshow(prism_tiles[4][8][0,...])
+plt.show()
+  
 for num in range(12):
   plt.close()
-  plt.imshow(prism_list_tiles[num][2][4][0,...])
-  plt.show()
-
-  plt.close()
-  plt.imshow(era5_list_tiles[num][2][4][num,...])
+  plt.imshow(era5_tiles[4][8][num,...])
   plt.show()
 
 plt.close()
-plt.imshow(dem_tiles[2][4][0,...])
+plt.imshow(dem_tiles[4][8][0,...])
 plt.show()
-
 
 plt.close()
 plt.imshow(prism_test_tiles[2][4][0,...])
 plt.show()
 
-plt.close()
-plt.imshow(era5_test_tiles[2][4][0,...])
-plt.show()
+for num in range(12):
+  plt.close()
+  plt.imshow(era5_test_tiles[2][4][num,...])
+  plt.show()
 
 plt.close()
 plt.imshow(dem_test_tiles[2][4][0,...])
 plt.show()
 
-prism_tiles_flat = torch.cat([tile for month in prism_list_tiles for row in month for tile in row], dim=0)
-#prism_tiles_flat = torch.cat([tile for row in prism_tiles for tile in row], dim=0)
+#prism_tiles_flat = torch.cat([tile for month in prism_list_tiles for row in month for tile in row], dim=0)
+prism_tiles_flat = torch.cat([tile for row in prism_tiles for tile in row], dim=0)
 # need to use stack here instead of cat because there's 3 channels
-# era5_tiles_flat = torch.stack([tile for row in era5_tiles for tile in row], dim=0)
-era5_tiles_flat = torch.cat([tile.unsqueeze(0) for seq in era5_list_tiles for row in seq for tile in row], dim=0)
-# dem_tiles_flat = torch.cat([tile for row in dem_tiles for tile in row], dim=0)
-dem_tiles_flat = torch.cat([tile for row in dem_tiles for tile in row for _ in range(12)], dim=0)
+era5_tiles_flat = torch.stack([tile for row in era5_tiles for tile in row], dim=0)
+#era5_tiles_flat = torch.cat([tile.unsqueeze(0) for seq in era5_list_tiles for row in seq for tile in row], dim=0)
+dem_tiles_flat = torch.cat([tile for row in dem_tiles for tile in row], dim=0)
+#dem_tiles_flat = torch.cat([tile for row in dem_tiles for tile in row for _ in range(12)], dim=0)
 
 prism_tiles_flat_test = torch.cat([tile for row in prism_test_tiles for tile in row], dim=0)
 # need to use stack here instead of cat because there's 3 channels
@@ -309,27 +329,27 @@ clean_prism = trim_tiles(clean_prism, 20)
 clean_era5 = trim_tiles(clean_era5, 20)
 clean_dem = trim_tiles(clean_dem, 20)
 
-# # remove any tiles with missing values for testing
-# clean_prism_test, clean_era5_test, clean_dem_test = remove_tiles(prism_tiles_flat_test, era5_tiles_flat_test, dem_tiles_flat_test)
-#
-# # remove any tiles that have any values=0 for testing
-# clean_prism_test, clean_era5_test, clean_dem_test = remove_zero_tiles(clean_prism_test, clean_era5_test, clean_dem_test)
+# remove any tiles with missing values for testing
+clean_prism_test, clean_era5_test, clean_dem_test = remove_tiles(prism_tiles_flat_test, era5_tiles_flat_test, dem_tiles_flat_test)
+
+# remove any tiles that have any values=0 for testing
+clean_prism_test, clean_era5_test, clean_dem_test = remove_zero_tiles(clean_prism_test, clean_era5_test, clean_dem_test)
 
 # check shapes
 print(clean_prism.shape)
 print(clean_era5.shape)
 print(clean_dem.shape)
-# print(clean_prism_test.shape)
-# print(clean_era5_test.shape)
-# print(clean_dem_test.shape)
+print(clean_prism_test.shape)
+print(clean_era5_test.shape)
+print(clean_dem_test.shape)
 
-# torch.save(clean_prism, prism_folder + "prism_tiles.pt")
-# torch.save(clean_era5, era5_folder + "era5_tiles.pt")
-# torch.save(clean_dem, dem_folder + "dem_tiles.pt")
+torch.save(clean_prism, prism_folder + "prism_tiles.pt")
+torch.save(clean_era5, era5_folder + "era5_tiles.pt")
+torch.save(clean_dem, dem_folder + "dem_tiles.pt")
 
-# torch.save(clean_prism_test, prism_folder + "prism_test_tiles.pt")
-# torch.save(clean_era5_test, era5_folder + "era5_test_tiles.pt")
-# torch.save(clean_dem_test, dem_folder + "dem_test_tiles.pt")
+torch.save(clean_prism_test, prism_folder + "prism_test_tiles.pt")
+torch.save(clean_era5_test, era5_folder + "era5_test_tiles.pt")
+torch.save(clean_dem_test, dem_folder + "dem_test_tiles.pt")
 ```
 
 ## Load model & predict (done on thufir):
@@ -410,7 +430,7 @@ torch.save(final_pad, "/sapho/tirion/GANs/results/" + "full_train_generator_250_
 ## Create raster:
 
 ```{python}
-final_pad = torch.load("O:/Mosaic_Yukon/Tirion/Results/Run12/mar/mar_gen250_fullregion.pt")
+final_pad = torch.load("O:/Mosaic_Yukon/Tirion/Results/foundational_model/tmax/Model2/jan/jan_gen250_fullregion.pt")
 
 res_np = np.array(final_pad)
 
@@ -426,14 +446,16 @@ library(terra)
 library(data.table)
 library(reticulate)
 library(RColorBrewer)
+library(raster)
 
-results_folder <- "O:/Mosaic_Yukon/Tirion/Results/Run12/mar/"
+results_folder <- "O:/Mosaic_Yukon/Tirion/Results/foundational_model/tmax/Model2/jan/"
 
-data_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/mar/"
+data_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/jan/"
 
 #dem_test <- rast(paste(dem_folder, "dem_test_cropped.nc", sep = ""))
 
-res <- dem[[1]]
+pred_dim <- dim(preds)
+res <- dem_extended[[1]]
 rast_dim <- dim(res)
 preds <- py$res_np
 dim(preds)
@@ -450,8 +472,16 @@ unstand_std <- x[[4]][1]
 res_us <- (res * unstand_std) + (unstand_mean)
 plot(res_us)
 
-final <- mask(res_us, land_mask, maskvalues=FALSE)
+# final <- mask(res_us, land_mask, maskvalues=FALSE)
+# plot(final)
+
+writeCDF(res_us, paste0(results_folder, "jan_fullregion.nc"), varname='tmax', overwrite = T)
+
+# use Susans maps as a mask
+cropped <- crop(res_us, sbeale)
+mask_aligned <- resample(sbeale, cropped, method="near")
+final <- mask(cropped, mask_aligned)
 plot(final)
 
-writeCDF(final, paste0(results_folder, "mar_fullregion_masked.nc"), varname='tmax', overwrite = T)
+writeCDF(final, paste0(results_folder, "jan_fullregion_masked.nc"), varname='tmax', overwrite = T)
 ```
