@@ -131,7 +131,7 @@ import matplotlib.patches as patches
 # 
 # res_np = np.array(final_pad)
 pred_np = np.array(pred.prec)
-#pred_np = np.log1p(pred_np)
+pred_np = np.log1p(pred_np)
 plt.close()
 fig, ax = plt.subplots()
 im = ax.imshow(pred_np, cmap = 'RdYlBu_r')
@@ -143,7 +143,7 @@ new_height = pos.height * 0.5
 new_y = pos.y0 + (pos.height - new_height) / 2
 cbar.ax.set_position([pos.x0, new_y, pos.width, new_height])
 ax.axis('off')
-plt.savefig(pred_dir + "apr_full_map_masked.png", bbox_inches='tight', dpi=600)
+#plt.savefig(pred_dir + "apr_full_map_masked.png", bbox_inches='tight', dpi=600)
 plt.show()
 
 res_np.shape
@@ -157,53 +157,28 @@ library(data.table)
 library(reticulate)
 library(RColorBrewer)
 
-results_folder <- "O:/Mosaic_Yukon/Tirion/Results/Run2/GAN_gen250/"
+results_folder <- "O:/Mosaic_Yukon/Tirion/Results/foundational_model/tmax/Model1/jan/"
 
-#dem_test <- rast(paste(dem_folder, "dem_test_cropped.nc", sep = ""))
-
+preds <- rast(paste(results_folder, "dec_fullregion_masked.nc", sep = ""))
 res <- dem[[1]]
 rast_dim <- dim(res)
-preds <- py$res_np
+preds <- log1p(preds) # for prec
 dim(preds)
 
 preds <- preds[1:rast_dim[1],1:rast_dim[2]]
 values(res) <- preds
-plot(res)
-# add rectangle of test area
-xmax_box <- xmin(res) + 288*xres(res)
-rect(
-  xleft = xmin(res), 
-  ybottom = ymin(res),
-  xright = xmax_box, 
-  ytop = ymax(res),
-  border = "black", 
-  lwd = 2
-)
+res[res <= 0] <- 0
+
+preds <- preds[apply(preds, 1, function(x) all(is.finite(x))), ]
+inc=diff(range(preds))/500
+breaks=seq(quantile(preds, 0.005)-inc, quantile(preds, 0.995)+inc, inc)
+ColScheme <- colorRampPalette(rev(brewer.pal(11, "RdYlBu")))(length(breaks)-1)
+plot(res, col = ColScheme)
 
 # save as png
-png(paste0(results_folder, "full_map.png"), width = 1000, height = 600)
-plot(res, asp = 1)
-# add rectangle of test area
-xmax_box <- xmin(res) + 288*xres(res)
-rect(
-  xleft = xmin(res), 
-  ybottom = ymin(res),
-  xright = xmax_box, 
-  ytop = ymax(res),
-  border = "black", 
-  lwd = 2
-)
+png(paste0(results_folder, "dec_full_map.png"), width = 1000, height = 600)
+plot(res, col = ColScheme)
 dev.off()
-
-# x <- read.csv(paste(data_folder, "standardization.csv", sep=""))
-# 
-# unstand_mean <- x[[3]][1]
-# unstand_std <- x[[4]][1]
-# 
-# res_us <- (res * unstand_std) + (unstand_mean)
-# plot(res_us)
-
-# writeCDF(res, paste0(results_folder, "GAN_gen250_fullregion_sd.nc"), varname='tmax', overwrite = T)
 ```
 
 ## Calculate lag1 pixel-wise correlation:
