@@ -39,9 +39,9 @@ plot(x = epochs, y = test_metrics[,3], xlab = "# of epochs", ylab = "Wass. dist"
 ## Load data:
 
 ```{python}
-pred_dir = 'O:/Mosaic_Yukon/Tirion/Results/foundational_model/prec/Model1/apr/'
-pred_path = pred_dir + 'apr_fullregion_masked.nc'
-truth_dir = 'C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/prec/apr/'
+pred_dir = 'O:/Mosaic_Yukon/Tirion/Results/foundational_model/tmax/Model2/sep/'
+pred_path = pred_dir + 'sep_fullregion_masked.nc'
+truth_dir = 'C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/sep/'
 truth_path = truth_dir + 'prism_train_coarse.nc' 
 
 # load GAN predictions and true fields (PRISM) 
@@ -61,7 +61,7 @@ stand = pd.read_csv(truth_dir + 'standardization.csv')
 
 mean = stand['mean'][0]
 std = stand['std'][0]
-truth['prec'] = (truth.prec*std)+mean
+truth['tmax'] = (truth.tmax*std)+mean
 
 # change pred longitude to degrees E to match truth
 pred = pred.assign_coords(longitude=pred.longitude % 360)
@@ -71,8 +71,8 @@ pred = pred.assign_coords(longitude=pred.longitude % 360)
 
 ```{python}
 # make torch tensors of fields to compute MAE
-pred_np = np.array(pred.prec)
-truth_np = np.array(truth.prec)
+pred_np = np.array(pred.tmax)
+truth_np = np.array(truth.tmax)
 
 # mask out nans
 mask = ~np.isnan(truth_np) & ~np.isnan(pred_np)
@@ -86,28 +86,28 @@ MAE = F.l1_loss(truth_valid.float(), pred_valid.float())
 # plotting truth, prediction, and difference (choose to save or not)
 fig, ax = plt.subplots(1, 3, layout='constrained', figsize=(10, 5), sharex=True, sharey=True)
 
-minmin = np.min(truth.prec)
-maxmax = np.max(truth.prec)
+minmin = np.min(truth.tmax)
+maxmax = np.max(truth.tmax)
 # precip (30), temp max (3)
 dmin = -3
 dmax = 3
 
-pc1 = ax[0].pcolormesh(truth.longitude, truth.latitude, truth.prec, vmin=minmin, vmax=maxmax, cmap='viridis', label=r'$m$')
+pc1 = ax[0].pcolormesh(truth.longitude, truth.latitude, truth.tmax, vmin=minmin, vmax=maxmax, cmap='viridis', label=r'$m$')
 ax[0].set_title(f'truth', fontsize='medium', loc='center')
 #ax[0].set_ylim(59, 71)
 
-pc2 = ax[1].pcolormesh(pred.longitude, pred.latitude, pred.prec, vmin=minmin, vmax=maxmax, cmap='viridis', label=r'$m$')
+pc2 = ax[1].pcolormesh(pred.longitude, pred.latitude, pred.tmax, vmin=minmin, vmax=maxmax, cmap='viridis', label=r'$m$')
 ax[1].set_title(f'prediction', fontsize='medium', loc='center')
 #ax[1].set_ylim(59, 71)
 
-pc3 = ax[2].pcolormesh(pred.longitude, pred.latitude, truth.prec.values-pred.prec.values, vmin=dmin, vmax=dmax, cmap='RdBu', label=r'$m$')
+pc3 = ax[2].pcolormesh(pred.longitude, pred.latitude, truth.tmax.values-pred.tmax.values, vmin=dmin, vmax=dmax, cmap='RdBu', label=r'$m$')
 ax[2].set_title(f'truth-prediction', fontsize='medium', loc='center')
 #ax[2].set_ylim(59, 71)
 
 fig.supylabel('latitude [deg N]')
 fig.supxlabel('longitude [deg E]')
 
-fig.suptitle(f"Apr prec, MAE = %.2f" %MAE)
+fig.suptitle(f"Sep tmax, MAE = %.2f" %MAE)
 
 fig.colorbar(pc1, shrink=0.5, aspect=20, location='bottom', ax=ax[0:2])
 fig.colorbar(pc3, shrink=0.9, aspect=20, location='bottom', ax=ax[2])
@@ -130,8 +130,8 @@ import matplotlib.patches as patches
 # final_pad = (final_pad*std)+mean
 # 
 # res_np = np.array(final_pad)
-pred_np = np.array(pred.prec)
-pred_np = np.log1p(pred_np)
+pred_np = np.array(pred.tmax)
+#pred_np = np.log1p(pred_np)
 plt.close()
 fig, ax = plt.subplots()
 im = ax.imshow(pred_np, cmap = 'RdYlBu_r')
@@ -143,7 +143,7 @@ new_height = pos.height * 0.5
 new_y = pos.y0 + (pos.height - new_height) / 2
 cbar.ax.set_position([pos.x0, new_y, pos.width, new_height])
 ax.axis('off')
-#plt.savefig(pred_dir + "apr_full_map_masked.png", bbox_inches='tight', dpi=600)
+plt.savefig(pred_dir + "sep_full_map_masked.png", bbox_inches='tight', dpi=600)
 plt.show()
 
 res_np.shape
