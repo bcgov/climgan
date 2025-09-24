@@ -26,7 +26,7 @@ library(matrixStats)
 
 ```{r}
 # load data
-test_metrics <- read.csv("C:/Users/TGRICE/Downloads/test_metrics.csv")
+test_metrics <- read.csv("O:/Mosaic_Yukon/Tirion/Results/foundational_model/Model1/mar/specialization1/test_metrics.csv")
 
 # plot MAE by epochs
 epochs <- seq(0, 250, by=10)
@@ -39,9 +39,9 @@ plot(x = epochs, y = test_metrics[,3], xlab = "# of epochs", ylab = "Wass. dist"
 ## Load data:
 
 ```{python}
-pred_dir = 'O:/Mosaic_Yukon/Tirion/Results/Run4/GAN_gen250/'
-pred_path = pred_dir + 'Run4_gen250_testregion.nc'
-truth_dir = 'C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/mar/'
+pred_dir = 'O:/Mosaic_Yukon/Tirion/Results/foundational_model/tmax/Model2/sep/'
+pred_path = pred_dir + 'sep_fullregion_masked.nc'
+truth_dir = 'C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/sep/'
 truth_path = truth_dir + 'prism_train_coarse.nc' 
 
 # load GAN predictions and true fields (PRISM) 
@@ -49,7 +49,7 @@ pred = xr.open_dataset(pred_path)
 truth = xr.open_dataset(truth_path)
 
 # crop truth to the size of pred if needed
-truth = truth.isel(longitude=slice(0,288))
+#truth = truth.isel(longitude=slice(0,288))
 ```
 
 ## Prepare test data (truth):
@@ -59,9 +59,9 @@ truth = truth.isel(longitude=slice(0,288))
 stand = pd.read_csv(truth_dir + 'standardization.csv')
 #stand
 
-# mean = stand['mean'][0]
-# std = stand['std'][0]
-# truth['tmax'] = (truth.tmax*std)+mean
+mean = stand['mean'][0]
+std = stand['std'][0]
+truth['tmax'] = (truth.tmax*std)+mean
 
 # change pred longitude to degrees E to match truth
 pred = pred.assign_coords(longitude=pred.longitude % 360)
@@ -94,24 +94,24 @@ dmax = 3
 
 pc1 = ax[0].pcolormesh(truth.longitude, truth.latitude, truth.tmax, vmin=minmin, vmax=maxmax, cmap='viridis', label=r'$m$')
 ax[0].set_title(f'truth', fontsize='medium', loc='center')
-ax[0].set_ylim(59, 71)
+#ax[0].set_ylim(59, 71)
 
 pc2 = ax[1].pcolormesh(pred.longitude, pred.latitude, pred.tmax, vmin=minmin, vmax=maxmax, cmap='viridis', label=r'$m$')
 ax[1].set_title(f'prediction', fontsize='medium', loc='center')
-ax[1].set_ylim(59, 71)
+#ax[1].set_ylim(59, 71)
 
 pc3 = ax[2].pcolormesh(pred.longitude, pred.latitude, truth.tmax.values-pred.tmax.values, vmin=dmin, vmax=dmax, cmap='RdBu', label=r'$m$')
 ax[2].set_title(f'truth-prediction', fontsize='medium', loc='center')
-ax[2].set_ylim(59, 71)
+#ax[2].set_ylim(59, 71)
 
 fig.supylabel('latitude [deg N]')
 fig.supxlabel('longitude [deg E]')
 
-fig.suptitle(f"March tmax, MAE = %.2f" %MAE)
+fig.suptitle(f"Sep tmax, MAE = %.2f" %MAE)
 
 fig.colorbar(pc1, shrink=0.5, aspect=20, location='bottom', ax=ax[0:2])
 fig.colorbar(pc3, shrink=0.9, aspect=20, location='bottom', ax=ax[2])
-plt.savefig(pred_dir + "pred_PRISM_test_diff_testarea.png", dpi = 400)
+plt.savefig(pred_dir + "pred_PRISM_diff.png", dpi = 400)
 plt.close()
 ```
 
@@ -122,22 +122,28 @@ Create raster:
 ```{python}
 import matplotlib.patches as patches
 
-final_pad = torch.load("O:/Mosaic_Yukon/Tirion/Results/Run4/GAN_gen250/Run4_gen250_fullregion.pt")
-
-res_np = np.array(final_pad)
-
+# final_pad = torch.load("O:/Mosaic_Yukon/Tirion/Results/Run7/GAN_gen250/Run7_gen250_fullregion.pt")
+# 
+# # unstandardize
+# mean = stand['mean'][0]
+# std = stand['std'][0]
+# final_pad = (final_pad*std)+mean
+# 
+# res_np = np.array(final_pad)
+pred_np = np.array(pred.tmax)
+#pred_np = np.log1p(pred_np)
 plt.close()
 fig, ax = plt.subplots()
-im = ax.imshow(res_np)
-rect = patches.Rectangle((0, 0), 288, res_np.shape[0], linewidth=2, edgecolor='black', facecolor='none')
-ax.add_patch(rect)
-# cbar = plt.colorbar(im)
-# pos = cbar.ax.get_position()
-# new_height = pos.height * 0.5
-# new_y = pos.y0 + (pos.height - new_height) / 2
-# cbar.ax.set_position([pos.x0, new_y, pos.width, new_height])
+im = ax.imshow(pred_np, cmap = 'RdYlBu_r')
+# rect = patches.Rectangle((0, 0), 288, pred_np.shape[0], linewidth=2, edgecolor='black', facecolor='none')
+# ax.add_patch(rect)
+cbar = plt.colorbar(im)
+pos = cbar.ax.get_position()
+new_height = pos.height * 0.5
+new_y = pos.y0 + (pos.height - new_height) / 2
+cbar.ax.set_position([pos.x0, new_y, pos.width, new_height])
 ax.axis('off')
-plt.savefig(pred_dir + "full_map.png", bbox_inches='tight', dpi=600)
+plt.savefig(pred_dir + "sep_full_map_masked.png", bbox_inches='tight', dpi=600)
 plt.show()
 
 res_np.shape
@@ -151,53 +157,28 @@ library(data.table)
 library(reticulate)
 library(RColorBrewer)
 
-results_folder <- "O:/Mosaic_Yukon/Tirion/Results/Run2/GAN_gen250/"
+results_folder <- "O:/Mosaic_Yukon/Tirion/Results/foundational_model/tmax/Model1/jan/"
 
-#dem_test <- rast(paste(dem_folder, "dem_test_cropped.nc", sep = ""))
-
+preds <- rast(paste(results_folder, "dec_fullregion_masked.nc", sep = ""))
 res <- dem[[1]]
 rast_dim <- dim(res)
-preds <- py$res_np
+preds <- log1p(preds) # for prec
 dim(preds)
 
 preds <- preds[1:rast_dim[1],1:rast_dim[2]]
 values(res) <- preds
-plot(res)
-# add rectangle of test area
-xmax_box <- xmin(res) + 288*xres(res)
-rect(
-  xleft = xmin(res), 
-  ybottom = ymin(res),
-  xright = xmax_box, 
-  ytop = ymax(res),
-  border = "black", 
-  lwd = 2
-)
+res[res <= 0] <- 0
+
+preds <- preds[apply(preds, 1, function(x) all(is.finite(x))), ]
+inc=diff(range(preds))/500
+breaks=seq(quantile(preds, 0.005)-inc, quantile(preds, 0.995)+inc, inc)
+ColScheme <- colorRampPalette(rev(brewer.pal(11, "RdYlBu")))(length(breaks)-1)
+plot(res, col = ColScheme)
 
 # save as png
-png(paste0(results_folder, "full_map.png"), width = 1000, height = 600)
-plot(res, asp = 1)
-# add rectangle of test area
-xmax_box <- xmin(res) + 288*xres(res)
-rect(
-  xleft = xmin(res), 
-  ybottom = ymin(res),
-  xright = xmax_box, 
-  ytop = ymax(res),
-  border = "black", 
-  lwd = 2
-)
+png(paste0(results_folder, "dec_full_map.png"), width = 1000, height = 600)
+plot(res, col = ColScheme)
 dev.off()
-
-# x <- read.csv(paste(data_folder, "standardization.csv", sep=""))
-# 
-# unstand_mean <- x[[3]][1]
-# unstand_std <- x[[4]][1]
-# 
-# res_us <- (res * unstand_std) + (unstand_mean)
-# plot(res_us)
-
-# writeCDF(res, paste0(results_folder, "GAN_gen250_fullregion_sd.nc"), varname='tmax', overwrite = T)
 ```
 
 ## Calculate lag1 pixel-wise correlation:
@@ -212,96 +193,87 @@ def lag1(x):
     x1 = x[1:] - x_mean
     return np.nansum(x0 * x1) / np.nansum(x0**2)
   
-jan = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/jan/prism_train_coarse.nc"
-feb = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/feb/prism_train_coarse.nc"
-mar = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/mar/prism_train_coarse.nc"
-apr = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/apr/prism_train_coarse.nc"
-may = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/may/prism_train_coarse.nc"
-jun = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/jun/prism_train_coarse.nc"
-jul = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/jul/prism_train_coarse.nc"
-aug = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/aug/prism_train_coarse.nc"
-sep = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/sep/prism_train_coarse.nc"
-oct = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/oct/prism_train_coarse.nc"
-nov = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/nov/prism_train_coarse.nc"
-dec = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/dec/prism_train_coarse.nc"
+months = ["nov", "dec", "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct"]
 
-ds1  = xr.open_dataset(jan)
-ds2  = xr.open_dataset(feb)
-ds3  = xr.open_dataset(mar)
-ds4  = xr.open_dataset(apr)
-ds5  = xr.open_dataset(may)
-ds6  = xr.open_dataset(jun)
-ds7  = xr.open_dataset(jul)
-ds8  = xr.open_dataset(aug)
-ds9  = xr.open_dataset(sep)
-ds10  = xr.open_dataset(oct)
-ds11  = xr.open_dataset(nov)
-ds12  = xr.open_dataset(dec)
+base_path = "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax"
 
-data = xr.concat([ds1['tmax'], ds2['tmax'], ds3['tmax'], ds4['tmax'], ds5['tmax'], ds6['tmax'], ds7['tmax'], ds8['tmax'], ds9['tmax'], ds10['tmax'], ds11['tmax'], ds12['tmax']], dim="time")
+datasets = []
 
-lag1_map = xr.apply_ufunc(
+for month in months:
+    nc_path = f"{base_path}/{month}/prism_train_coarse.nc"
+    csv_path = f"{base_path}/{month}/standardization.csv"
+
+    ds = xr.open_dataset(nc_path)
+
+    stand = pd.read_csv(csv_path)
+    mean = stand['mean'][0]
+    std = stand['std'][0]
+
+    ds['tmax'] = (ds['tmax'] * std) + mean
+
+    datasets.append(ds['tmax'])
+
+data_wt = xr.concat(datasets[0:3], dim="time")
+data_sm = xr.concat(datasets[6:9], dim="time")
+
+lag1_map_wt = xr.apply_ufunc(
     lag1,
-    data,
+    data_wt,
     input_core_dims=[["time"]],
     vectorize=True,
     output_dtypes=[float]
 )
 
-plt.close()
-plt.figure(figsize=(8, 6))
-lag1_map.plot(cmap="coolwarm", vmin=-1, vmax=1)
+lag1_map_sm = xr.apply_ufunc(
+    lag1,
+    data_sm,
+    input_core_dims=[["time"]],
+    vectorize=True,
+    output_dtypes=[float]
+)
+
+maps = [lag1_map_wt, lag1_map_sm]
+titles = ["Winter", "Summer"]
+
+fig, axes = plt.subplots(1, 2, figsize=(12, 10))
+axes = axes.flatten()
+
+for ax, data, title in zip(axes, maps, titles):
+    data.plot(ax=ax, cmap="coolwarm", vmin=-1, vmax=1, add_colorbar=True)
+    ax.set_title(title)
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+plt.tight_layout()
 plt.show()
 # writeCDF(res, paste0(results_folder, "GAN_gen250_fullregion_sd.nc"), varname='tmax', overwrite = T)
 ```
 
-## Calculating pixelwise difference:
+## Calculate pixel-wise difference:
 
 ```{python}
-def calculate_difference(ds1, ds2, var=None):
-    """
-    Calculate pixel-wise difference between two climate maps.
-    """
-    data1 = ds1[var]
-    data2 = ds2[var]
+diffs = [datasets[i+1] - datasets[i] for i in range(len(datasets) - 1)]
 
-    # Calculate the difference
-    diff = data2 - data1
-
-    return diff
-
-diff1 = calculate_difference(ds1, ds2, 'tmax')
-diff2 = calculate_difference(ds2, ds3, 'tmax')
-diff3 = calculate_difference(ds3, ds4, 'tmax')
-diff4 = calculate_difference(ds4, ds5, 'tmax')
-diff5 = calculate_difference(ds5, ds6, 'tmax')
-diff6 = calculate_difference(ds6, ds7, 'tmax')
-diff7 = calculate_difference(ds7, ds8, 'tmax')
-diff8 = calculate_difference(ds8, ds9, 'tmax')
-diff9 = calculate_difference(ds9, ds10, 'tmax')
-diff10 = calculate_difference(ds10, ds11, 'tmax')
-diff11 = calculate_difference(ds11, ds12, 'tmax')
-
-diffs = [diff1, diff2, diff3, diff4, diff5, diff6, diff7, diff8, diff9, diff10, diff11]
 labels = ["Feb-Jan", "Mar-Feb", "Apr-Mar", "May-Apr", "Jun-May", "Jul-Jun", "Aug-Jul", "Sep-Aug", "Oct-Sep", "Nov-Oct", "Dec-Nov"]
 
-# Create a 3x4 grid
 plt.close()
 fig, axes = plt.subplots(3, 4, figsize=(28, 16))
 axes = axes.flatten()
 
 for ax, diff, label in zip(axes, diffs, labels):
     diff.plot(ax=ax, cmap='coolwarm', add_colorbar=True)
-    ax.set_title(label)
-    ax.set_xticks([])  # Remove x-axis ticks
-    ax.set_yticks([])  # Remove y-axis ticks
-    ax.set_xlabel('')  # Remove x-axis label
-    ax.set_ylabel('')  # Remove y-axis label
+    ax.set_title(label, fontsize=12)
+    ax.set_xticks([])  # remove x-axis ticks
+    ax.set_yticks([])  # remove y-axis ticks
+    ax.set_xlabel('')  # remove x-axis label
+    ax.set_ylabel('')  # remove y-axis label
 
 # Turn off the last empty subplot if grid > number of diffs
 for ax in axes[len(diffs):]:
     ax.axis('off')
 
-plt.subplots_adjust(hspace=1, wspace=.5)
+# Adjust spacing: more space between rows and columns
+plt.subplots_adjust(hspace=0.5, wspace=0.75)
+
 plt.show()
 ```

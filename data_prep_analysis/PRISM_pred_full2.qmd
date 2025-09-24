@@ -23,8 +23,8 @@ library(terra)
 ```
 
 ```{r}
-pred_fold <- "//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/operational/worldclim/tmin/dec/Predictions/gen2/"
-data_folder <- "//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/operational/worldclim/tmin/dec/shift16_32/"
+pred_fold <- "//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/operational/worldclim/tmin/mar/Predictions/gen2/"
+data_folder <- "//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/operational/worldclim/tmin/mar/shift16_32/"
 
 cov_folder <- "//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/operational/Covariates/"
 
@@ -236,22 +236,6 @@ tile_size = 144
 offset = 12
 # prism
 prism_tiles = tile_data(prism.unsqueeze(0), tile_size, offset)
-
-# era5 - this is for using previous 2 months as covariates
-# months = [1,2,3]
-# tiles_per_month = []
-# 
-# for m in months:
-#     tiles = tile_data(standardized_era5[m].unsqueeze(0), int(tile_size / scale_factor), int(offset / scale_factor))
-#     
-#     # Flatten tile list-of-lists
-#     flat_tiled = [tile for row in tiles for tile in row]
-#     tiles_per_month.append(flat_tiled)
-#     
-# era5_tiles = torch.stack([
-#     torch.cat([tiles_per_month[m][i] for m in range(3)], dim=0)
-#     for i in range(len(tiles_per_month[0]))
-# ])
 
 era5_tiles = tile_data(standardized_era5[3].unsqueeze(0), int(tile_size / scale_factor), int(offset / scale_factor))
 
