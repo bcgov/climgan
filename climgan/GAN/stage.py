@@ -60,6 +60,13 @@ class StageData:
         # Define optimizers
         self.G_optimizer = torch.optim.Adam(self.generator.parameters(), hp.lr, betas=(0.9, 0.99))
         self.C_optimizer = torch.optim.Adam(self.critic.parameters(), hp.lr, betas=(0.9, 0.99))
+        
+        if(specialise):
+          checkpoint = torch.load(data_folder + "Checkpoint_250.pth", map_location=config.device)
+          self.generator.load_state_dict(checkpoint["generator_state_dict"])
+          self.critic.load_state_dict(checkpoint["critic_state_dict"])
+          self.G_optimizer.load_state_dict(checkpoint["g_optimizer_state_dict"])
+          self.C_optimizer.load_state_dict(checkpoint["c_optimizer_state_dict"])
 
         # Set up the run
         # Define the mlflow experiment drectories
