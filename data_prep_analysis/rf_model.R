@@ -114,41 +114,69 @@ for (e in 1:length(elements)){
 # View results
 
 # rasters for the variable of interest
-wc <- worldclim[[((e-1)*12+1:12)[m]]]
-dm <- daymet[[((e-1)*12+1:12)[m]]]
-us <- prism
-cp <- clim.pred
+
+us <- list()
+for (i in seq_along(months)) {
+  prism <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/", months[i], "/prism_train_coarse.nc"))
+  us[[i]] <- prism
+}
+cp <- list()
+for (i in 1:12) {
+  pred <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/Random Forest/training area/tmax", sprintf("%02d", i), ".tif"))
+  cp[[i]] <- pred
+}
 
 # Color Scheme
-combined <- c(values(us), values(dm))
-if(elements[e]=="Pr") combined <- log2(combined)
+combined <- c(unlist(lapply(us, values)), unlist(lapply(cp, values)))
+# if(elements[e]=="Pr") combined <- log2(combined)
 combined <- combined[is.finite(combined)]
 inc=diff(range(combined))/500
 breaks=seq(quantile(combined, 0.005)-inc, quantile(combined, 0.995)+inc, inc)
-ColScheme <- colorRampPalette(if(elements[e]=="Pr") brewer.pal(9, "YlGnBu") else rev(brewer.pal(11, "RdYlBu")))(length(breaks)-1)
+# ColScheme <- colorRampPalette(if(elements[e]=="Pr") brewer.pal(9, "YlGnBu") else rev(brewer.pal(11, "RdYlBu")))(length(breaks)-1)
+ColScheme <- colorRampPalette(rev(brewer.pal(11, "RdYlBu")))(length(breaks)-1)
 ColPal <- colorBin(ColScheme, bins=breaks, na.color = "white")
 ColPal.raster <- colorBin(ColScheme, bins=breaks, na.color = "transparent")
 
-if(elements[e]=="Pr"){
-  values(us) <- log2(values(us))
-  values(cp) <- log2(values(cp))
-  values(wc) <- log2(values(wc))
-  values(dm) <- log2(values(dm))
-} 
+# if(elements[e]=="Pr"){
+#   values(us) <- log2(values(us))
+#   values(cp) <- log2(values(cp))
+#   values(wc) <- log2(values(wc))
+#   values(dm) <- log2(values(dm))
+# } 
 
 # leaflet map
 map <- leaflet() %>%
   addTiles(group = "basemap") %>%
   addProviderTiles('Esri.WorldImagery', group = "sat photo") %>%
   # addRasterImage(dem, colors =terrain.colors(99), opacity = 1, maxBytes = 6 * 1024 * 1024, group = "elevation") %>%
-  addRasterImage(us, colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "PRISM") %>%
-  addRasterImage(cp, colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "Predicted") %>%
-  addRasterImage(wc, colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "WorldClim") %>%
-  addRasterImage(dm, colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "Daymet") %>%
+  addRasterImage(us[[1]], colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "Jan PRISM") %>%
+  addRasterImage(us[[2]], colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "Feb PRISM") %>%
+  addRasterImage(us[[3]], colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "Mar PRISM") %>%
+  addRasterImage(us[[4]], colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "Apr PRISM") %>%
+  addRasterImage(us[[5]], colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "May PRISM") %>%
+  addRasterImage(us[[6]], colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "Jun PRISM") %>%
+  addRasterImage(us[[7]], colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "Jul PRISM") %>%
+  addRasterImage(us[[8]], colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "Aug PRISM") %>%
+  addRasterImage(us[[9]], colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "Sep PRISM") %>%
+  addRasterImage(us[[10]], colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "Oct PRISM") %>%
+  addRasterImage(us[[11]], colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "Nov PRISM") %>%
+  addRasterImage(us[[12]], colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "Dec PRISM") %>%
+  addRasterImage(cp[[1]], colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "Jan Predicted") %>%
+  addRasterImage(cp[[2]], colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "Feb Predicted") %>%
+  addRasterImage(cp[[3]], colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "Mar Predicted") %>%
+  addRasterImage(cp[[4]], colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "Apr Predicted") %>%
+  addRasterImage(cp[[5]], colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "May Predicted") %>%
+  addRasterImage(cp[[6]], colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "Jun Predicted") %>%
+  addRasterImage(cp[[7]], colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "Jul Predicted") %>%
+  addRasterImage(cp[[8]], colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "Aug Predicted") %>%
+  addRasterImage(cp[[9]], colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "Sep Predicted") %>%
+  addRasterImage(cp[[10]], colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "Oct Predicted") %>%
+  addRasterImage(cp[[11]], colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "Nov Predicted") %>%
+  addRasterImage(cp[[12]], colors = ColPal.raster, opacity = 1, maxBytes = 7 * 1024 * 1024, group = "Dec Predicted") %>%
   addLayersControl(
     baseGroups = c("basemap", "sat photo"),
-    overlayGroups = c("Daymet", "WorldClim", "Predicted", "PRISM"),
-    # overlayGroups = c("Daymet", "Predicted", "PRISM"),
+    overlayGroups = c("Jan PRISM", "Feb PRISM", "Mar PRISM", "Apr PRISM", "May PRISM", "Jun PRISM", "Jul PRISM", "Aug PRISM", "Sep PRISM", "Oct PRISM", "Nov PRISM", "Dec PRISM",
+                      "Jan Predicted", "Feb Predicted", "Mar Predicted", "Apr Predicted", "May Predicted", "Jun Predicted", "Jul Predicted", "Aug Predicted", "Sep Predicted", "Oct Predicted", "Nov Predicted", "Dec Predicted"),
     options = layersControlOptions(collapsed = FALSE)
   )
 map
