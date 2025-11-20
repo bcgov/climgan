@@ -58,6 +58,40 @@ era5_rast <- rast(era5_full)
 # e <- 3
 # m <- 2
 
+# load in data for predicting area
+dir <- paste("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/", sep="")
+dem.full <- rast(paste(dir, "dem/dem_full.nc", sep=""))
+mask <- dem.full > 0
+dem.pred <- mask(dem.full, mask, maskvalues = FALSE)
+plot(dem.pred)
+dem.pred <- focal(dem.pred, w=13, fun="min", na.policy="only") # add a buffer of minimum values around coastline to allow for a buffer of climate prediction
+plot(dem.pred)
+
+coastal.full <- rast(paste(dir, "dem/op/ocean_proximity_full.nc", sep=""))
+plot(coastal.full)
+coastal.full <- project(coastal.full, dem.pred)
+coastal.pred <- mask(coastal.full, dem.pred)
+plot(coastal.pred)
+
+era5_pred <- list()
+era5_vars <- c("tasmax", "tasmin", "prec")
+dir <- paste("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/era5_clim/", sep="")
+for (i in seq_along(era5_vars)) {
+  file <- list.files(path = paste0(dir, era5_vars[i], "/27x27/", sep=""), pattern = ".*_full\\.nc$")
+  era5 <- rast(file.path(dir, era5_vars[i], "27x27", file))
+  names(era5) <- paste0(elements[i], "_", monthcodes)
+  
+  # mask out ocean in era5
+  era5_aligned <- project(era5, dem)
+  era5_masked <- mask(era5_aligned, dem)
+  values(era5_masked)[!is.finite(values(era5_masked))] <- NA
+  if (era5_vars[i]=="prec") values(era5_masked) <- log2(values(era5_masked))
+  
+  era5_pred[[i]] <- era5_masked
+}
+names(era5_pred) <- elements
+era5_rast <- rast(era5_pred)
+
 for (e in 1:length(elements)){
   for (m in 1:length(monthcodes)){
     #browser()
@@ -104,7 +138,7 @@ for (e in 1:length(elements)){
     clim.pred[data.pred$id] <- pred.fillarea$predictions
     
     # write the raster
-    writeRaster(clim.pred, paste("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/Random Forest/", elements[e], monthcodes[m], ".tif", sep=""), overwrite=T)
+    writeRaster(clim.pred, paste("C:/Users/tgrice/OneDrive - Government of BC/Documents/GANs/Tirion/Results/Random Forest/", elements[e], monthcodes[m], ".tif", sep=""), overwrite=T)
     
     print(monthcodes[m])  
   }
