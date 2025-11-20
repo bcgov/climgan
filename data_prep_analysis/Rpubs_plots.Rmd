@@ -11,239 +11,58 @@ library(RColorBrewer)
 library(ranger)
 library(rworldmap)
 
-# # load Susan's maps
-# sbeale_feb <- rast("O:/Mosaic_Yukon/operational/WorldClim/tmax/feb/Predictions/GAN_gen100.nc")
-# # sbeale_sep <- log1p(sbeale_sep)
-# sbeale_feb <- sbeale_feb + 273.15 #convert to Kelvin
-# sbeale_feb <- aggregate(sbeale_feb, fact = 3) # coarsen to match my pred resolution
+# load the PRISM  data
+prism_jun <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/prec/jun/prism_train_coarse.nc")
+prism_jun <- log1p(prism_jun)
 
-# load the PRISM  data for the variable and unstandardize
-prism_apr <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/apr/old/prism_train_coarse.nc")
-stand <- read.csv("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/apr/old/standardization.csv")
-mean_val <- stand$mean[1]
-std_val  <- stand$std[1]
-prism_apr_unstd <- prism_apr * std_val + mean_val
-# prism_apr_final <- log1p(prism_apr_unstd)
-prism_apr_final <- prism_apr_unstd + 273.15 #convert to Kelvin
+# fm4 base
+pred_jun_fm4 <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/jun/jun_fullregion_masked.nc")
 
-prism_aug <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/aug/old/prism_train_coarse.nc")
-stand <- read.csv("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/aug/old/standardization.csv")
-mean_val <- stand$mean[1]
-std_val  <- stand$std[1]
-prism_aug_unstd <- prism_aug * std_val + mean_val
-# prism_aug_final <- log1p(prism_aug_unstd)
-prism_aug_final <- prism_aug_unstd + 273.15 #convert to Kelvin
+# spec1,2,3 of gan50
+pred_jun_fm4_spec1 <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/jun/spec1/gen50/jun_fullregion_masked.nc")
+pred_jun_fm4_spec2 <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/jun/spec2/gen50/jun_fullregion_masked.nc")
+pred_jun_fm4_spec3 <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/jun/spec3/gen50/jun_fullregion_masked.nc")
 
-prism_dec <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/dec/old/prism_train_coarse.nc")
-stand <- read.csv("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/dec/old/standardization.csv")
-mean_val <- stand$mean[1]
-std_val  <- stand$std[1]
-prism_dec_unstd <- prism_dec * std_val + mean_val
-# prism_dec_final <- log1p(prism_dec_unstd)
-prism_dec_final <- prism_dec_unstd + 273.15 #convert to Kelvin
+jun_sd <- app(c(pred_jun_fm4_spec1, pred_jun_fm4_spec2, pred_jun_fm4_spec3), sd)
 
-prism_feb <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/feb/old/prism_train_coarse.nc")
-stand <- read.csv("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/feb/old/standardization.csv")
-mean_val <- stand$mean[1]
-std_val  <- stand$std[1]
-prism_feb_unstd <- prism_feb * std_val + mean_val
-# prism_feb_final <- log1p(prism_feb_unstd)
-prism_feb_final <- prism_feb_unstd + 273.15 #convert to Kelvin
-
-prism_jan <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/jan/old/prism_train_coarse.nc")
-stand <- read.csv("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/jan/old/standardization.csv")
-mean_val <- stand$mean[1]
-std_val  <- stand$std[1]
-prism_jan_unstd <- prism_jan * std_val + mean_val
-# prism_jan_final <- log1p(prism_jan_unstd)
-prism_jan_final <- prism_jan_unstd + 273.15 #convert to Kelvin
-
-prism_jul <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/jul/old/prism_train_coarse.nc")
-stand <- read.csv("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/jul/old/standardization.csv")
-mean_val <- stand$mean[1]
-std_val  <- stand$std[1]
-prism_jul_unstd <- prism_jul * std_val + mean_val
-# prism_jul_final <- log1p(prism_jul_unstd)
-prism_jul_final <- prism_jul_unstd + 273.15 #convert to Kelvin
-
-prism_jun <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/jun/old/prism_train_coarse.nc")
-stand <- read.csv("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/jun/old/standardization.csv")
-mean_val <- stand$mean[1]
-std_val  <- stand$std[1]
-prism_jun_unstd <- prism_jun * std_val + mean_val
-# prism_jun_final <- log1p(prism_jun_unstd)
-prism_jun_final <- prism_jun_unstd + 273.15 #convert to Kelvin
-
-prism_mar <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/mar/old/prism_train_coarse.nc")
-stand <- read.csv("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/mar/old/standardization.csv")
-mean_val <- stand$mean[1]
-std_val  <- stand$std[1]
-prism_mar_unstd <- prism_mar * std_val + mean_val
-# prism_mar_final <- log1p(prism_mar_unstd)
-prism_mar_final <- prism_mar_unstd + 273.15 #convert to Kelvin
-
-prism_may <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/may/old/prism_train_coarse.nc")
-stand <- read.csv("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/may/old/standardization.csv")
-mean_val <- stand$mean[1]
-std_val  <- stand$std[1]
-prism_may_unstd <- prism_may * std_val + mean_val
-# prism_may_final <- log1p(prism_may_unstd)
-prism_may_final <- prism_may_unstd + 273.15 #convert to Kelvin
-
-prism_nov <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/nov/old/prism_train_coarse.nc")
-stand <- read.csv("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/nov/old/standardization.csv")
-mean_val <- stand$mean[1]
-std_val  <- stand$std[1]
-prism_nov_unstd <- prism_nov * std_val + mean_val
-# prism_nov_final <- log1p(prism_nov_unstd)
-prism_nov_final <- prism_nov_unstd + 273.15 #convert to Kelvin
-
-prism_oct <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/oct/old/prism_train_coarse.nc")
-stand <- read.csv("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/oct/old/standardization.csv")
-mean_val <- stand$mean[1]
-std_val  <- stand$std[1]
-prism_oct_unstd <- prism_oct * std_val + mean_val
-# prism_oct_final <- log1p(prism_oct_unstd)
-prism_oct_final <- prism_oct_unstd + 273.15 #convert to Kelvin
-
-prism_sep <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/sep/old/prism_train_coarse.nc")
-stand <- read.csv("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/sep/old/standardization.csv")
-mean_val <- stand$mean[1]
-std_val  <- stand$std[1]
-prism_sep_unstd <- prism_sep * std_val + mean_val
-# prism_sep_final <- log1p(prism_sep_unstd)
-prism_sep_final <- prism_sep_unstd + 273.15 #convert to Kelvin
-
-# load predicted data
-pred_apr <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmax/Model3/apr/apr_fullregion_masked.nc")
-pred_apr <- pred_apr + 273.15 #convert to Kelvin
-pred_aug <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmax/Model3/aug/aug_fullregion_masked.nc")
-pred_aug <- pred_aug + 273.15 #convert to Kelvin
-pred_dec <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmax/Model3/dec/dec_fullregion_masked.nc")
-pred_dec <- pred_dec + 273.15 #convert to Kelvin
-pred_feb <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmax/Model3/feb/feb_fullregion_masked.nc")
-pred_feb <- pred_feb + 273.15 #convert to Kelvin
-pred_jan <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmax/Model3/jan/jan_fullregion_masked.nc")
-pred_jan <- pred_jan + 273.15 #convert to Kelvin
-pred_jul <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmax/Model3/jul/jul_fullregion_masked.nc")
-pred_jul <- pred_jul + 273.15 #convert to Kelvin
-pred_jun <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmax/Model3/jun/jun_fullregion_masked.nc")
-pred_jun <- pred_jun + 273.15 #convert to Kelvin
-pred_mar <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmax/Model3/mar/mar_fullregion_masked.nc")
-pred_mar <- pred_mar + 273.15 #convert to Kelvin
-pred_may <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmax/Model3/may/may_fullregion_masked.nc")
-pred_may <- pred_may + 273.15 #convert to Kelvin
-pred_nov <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmax/Model3/nov/nov_fullregion_masked.nc")
-pred_nov <- pred_nov + 273.15 #convert to Kelvin
-pred_oct <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmax/Model3/oct/oct_fullregion_masked.nc")
-pred_oct <- pred_oct + 273.15 #convert to Kelvin
-pred_sep <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmax/Model3/sep/sep_fullregion_masked.nc")
-pred_sep <- pred_sep + 273.15 #convert to Kelvin
-
-# sd <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmax/Model1/apr/sd_map_spec.nc")
-
-# # load ERA5 data
-# era5_apr <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/era5_clim/tasmax/tasmax_1981_2010_cropped.nc")[[4]]
-# # era5_sep_log <- log1p(era5_sep)
-# cropped <- crop(era5_apr, pred_apr1)
-# mask_aligned <- resample(pred_apr1, cropped, method="near")
-# era5_apr_final <- mask(cropped, mask_aligned)
-
-# pred_sep <- log1p(pred_sep)
-
-all_values <- c(values(prism_apr_final),
-                values(prism_aug_final),
-                values(prism_dec_final),
-                values(prism_feb_final),
-                values(prism_jan_final),
-                values(prism_jul_final),
-                values(prism_jun_final),
-                values(prism_mar_final),
-                values(prism_may_final),
-                values(prism_nov_final),
-                values(prism_oct_final),
-                values(prism_sep_final),
-                values(pred_apr),
-                values(pred_aug),
-                values(pred_dec),
-                values(pred_feb),
-                values(pred_jan),
-                values(pred_jul),
-                values(pred_jun),
-                values(pred_mar),
-                values(pred_may),
-                values(pred_nov),
-                values(pred_oct),
-                values(pred_sep)
-                )
+all_values <- c(values(prism_jun),
+                values(pred_jun_fm4),
+                values(pred_jun_fm4_spec1),
+                values(pred_jun_fm4_spec2),
+                values(pred_jun_fm4_spec3)
+)
 
 all_values <- all_values[is.finite(all_values)]
 inc=diff(range(all_values))/500
-breaks=seq(quantile(all_values, 0.005)-inc, quantile(all_values, 0.995)+inc, inc)
-ColScheme <- colorRampPalette(rev(brewer.pal(11, "RdYlBu")))(length(breaks)-1)
+breaks=seq(quantile(all_values, 0.00025)-inc, quantile(all_values, 0.99975)+inc, inc)
+ColScheme <- colorRampPalette(brewer.pal(9, "YlGnBu"))(length(breaks)-1)
 ColPal <- colorBin(ColScheme, bins=breaks, na.color = "white")
 ColPal.raster <- colorBin(ColScheme, bins=breaks, na.color = "transparent")
 
-# vals <- values(sd)
-# vals <- vals[!is.na(vals)]
-# ColScheme_sd <- c("white", "black")
-# ColPal_sd <- colorNumeric(ColScheme_sd, domain = vals, na.color = "white")
-# ColPalsd.raster <- colorNumeric(ColScheme_sd, domain = vals, na.color = "transparent")
+vals <- values(jun_sd)
+vals <- vals[!is.na(vals)]
+ColScheme_sd <- c("white", "black")
+ColPal_sd <- colorNumeric(ColScheme_sd, domain = vals, na.color = "white")
+ColPalsd.raster <- colorNumeric(ColScheme_sd, domain = vals, na.color = "transparent")
 
 # leaflet map
 map <- leaflet() %>%
   addTiles(group = "basemap") %>%
   addProviderTiles('Esri.WorldImagery', group = "sat photo") %>%
-  addRasterImage(prism_jan_final, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "JAN PRISM") %>%
-  addRasterImage(prism_feb_final, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "FEB PRISM") %>%
-  addRasterImage(prism_mar_final, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "MAR PRISM") %>%
-  addRasterImage(prism_apr_final, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "APR PRISM") %>%
-  addRasterImage(prism_may_final, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "MAY PRISM") %>%
-  addRasterImage(prism_jun_final, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "JUN PRISM") %>%
-  addRasterImage(prism_jul_final, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "JUL PRISM") %>%
-  addRasterImage(prism_aug_final, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "AUG PRISM") %>%
-  addRasterImage(prism_sep_final, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "SEP PRISM") %>%
-  addRasterImage(prism_oct_final, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "OCT PRISM") %>%
-  addRasterImage(prism_nov_final, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "NOV PRISM") %>%
-  addRasterImage(prism_dec_final, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "DEC PRISM") %>%
-  addRasterImage(pred_jan, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "JAN FM") %>%
-  addRasterImage(pred_feb, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "FEB FM") %>%
-  addRasterImage(pred_mar, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "MAR FM") %>%
-  addRasterImage(pred_apr, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "APR FM") %>%
-  addRasterImage(pred_may, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "MAY FM") %>%
-  addRasterImage(pred_jun, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "JUN FM") %>%
-  addRasterImage(pred_jul, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "JUL FM") %>%
-  addRasterImage(pred_aug, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "AUG FM") %>%
-  addRasterImage(pred_sep, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "SEP FM") %>%
-  addRasterImage(pred_oct, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "OCT FM") %>%
-  addRasterImage(pred_nov, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "NOV FM") %>%
-  addRasterImage(pred_dec, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "DEC FM") %>%
+  addRasterImage(prism_jun, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "JUN PRISM") %>%
+  addRasterImage(pred_jun_fm4, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "JUN GAN FM4") %>%
+  addRasterImage(pred_jun_fm4_spec1, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "JUN GAN50 S1") %>%
+  addRasterImage(pred_jun_fm4_spec2, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "JUN GAN50 S2") %>%
+  addRasterImage(pred_jun_fm4_spec3, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "JUN GAN50 S3") %>%
+  addRasterImage(jun_sd, colors = ColPalsd.raster, opacity = 1, maxBytes = 12890669, group = "JUN GAN50 std dev") %>%
   addLayersControl(
-        overlayGroups = c("JAN PRISM",
-                          "FEB PRISM",
-                          "MAR PRISM",
-                          "APR PRISM",
-                          "MAY PRISM",
-                          "JUN PRISM",
-                          "JUL PRISM",
-                          "AUG PRISM",
-                          "SEP PRISM",
-                          "OCT PRISM",
-                          "NOV PRISM",
-                          "DEC PRISM",
-                          "JAN FM",
-                          "FEB FM",
-                          "MAR FM",
-                          "APR FM",
-                          "MAY FM",
-                          "JUN FM",
-                          "JUL FM",
-                          "AUG FM",
-                          "SEP FM",
-                          "OCT FM",
-                          "NOV FM",
-                          "DEC FM"
-                          ),
+    overlayGroups = c("JUN PRISM",
+                      "JUN GAN FM4",
+                      "JUN GAN50 S1",
+                      "JUN GAN50 S2",
+                      "JUN GAN50 S3",
+                      "JUN GAN50 std dev"
+    ),
     options = layersControlOptions(collapsed = FALSE)
   )
 map

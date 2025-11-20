@@ -59,3 +59,15 @@ df <- data.frame(
 )
 
 write.csv(df, "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/prec/standardization.csv", row.names = FALSE)
+
+# create test of full area (including Alaska testing area) for random forest model
+months <- c("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
+
+for (month in months) {
+  prism_folder <- paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmin/", month, "/")
+  prism <- rast(paste(prism_folder, "prism_train_coarse.nc", sep=""))
+  test <- rast(paste0(prism_folder, "prism_test.nc", sep=""))
+  
+  combined <- merge(prism, test)
+  writeRaster(combined, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmin/", month, "/prism_full.nc", sep=""), overwrite=TRUE)
+}

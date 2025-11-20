@@ -102,7 +102,7 @@ extended <- ext(ext(ocean_prox)[1], ext(ocean_prox)[2], ext(ocean_prox)[3] - 1, 
 op_extended <- rast(extended, resolution = res(ocean_prox), crs = crs(ocean_prox))
 values(op_extended) <- 0
 op_extended <- merge(ocean_prox, op_extended)
-writeCDF(op_extended, paste0(dem_folder, "op/op_pred.nc"), overwrite = TRUE)
+#writeCDF(op_extended, paste0(dem_folder, "op/op_pred.nc"), overwrite = TRUE)
 
 plot(op_extended)
 ```
@@ -158,11 +158,11 @@ dim(ocean_prox)
 # bdy.bc <- project(vect(bcmaps::bc_bound()), bdy)
 ```
 
-### Add ocean proximity, slope and aspect as hrcov: (DONE)
+### Add ocean proximity as hrcov: (DONE)
 
 ```{r}
 # create the ocean proximity layer
-dem <- rast(paste(dem_folder, "dem_test.nc", sep = ""))
+dem <- rast(paste(dem_folder, "test area prep/dem_stn_test.nc", sep = ""))
 fact=4
 dem.coarse <- aggregate(dem, fact=fact) # you could use a different aggregation factor if this is too coarse
 plot(dem.coarse)
@@ -191,7 +191,7 @@ plot(coastal_masked)
 # aspect <- terrain(dem, v = "aspect", unit = "degrees")
 # plot(aspect)
 
-writeCDF(coastal_masked, paste0(dem_folder, "ocean_proximity_test.nc"), varname='proximity', overwrite = T)
+writeCDF(coastal_masked, paste0(dem_folder, "op_stn_test.nc"), varname='proximity', overwrite = T)
 #writeCDF(slope, paste0(dem_folder, "slope.nc"), varname='slope', overwrite = T)
 #writeCDF(aspect, paste0(dem_folder, "aspect.nc"), varname='aspect', overwrite = T)
 ```
@@ -574,7 +574,7 @@ torch.save(final_pad, "/sapho/tirion/GANs/results/" + "full_train_generator_250_
 ## Create raster:
 
 ```{python}
-final_pad = torch.load("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmax/Model3/sep/sep_gen240_fullregion.pt")
+final_pad = torch.load("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/jun/spec1/debias/jun_fullregion_ext.pt")
 #final_pad1 = F.pad(final_pad, (0, 59), mode="constant", value=0) 
 
 res_np = np.array(final_pad)
@@ -593,16 +593,18 @@ library(reticulate)
 library(RColorBrewer)
 library(raster)
 
-results_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmax/Model3/sep/"
+results_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/jun/spec1/debias/"
 
-data_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/sep/old/"
+data_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/prec/jun/"
 
 #sbeale <- rast("O:/Mosaic_Yukon/operational/WorldClim/prec/feb/Predictions/GAN_gen150.nc")
 
 #dem <- rast(paste(dem_folder, "dem_test.nc", sep = ""))
 
+dem_extended <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/dem/test area prep/dem_stn_train.nc")
+
 res <- dem_extended[[1]]
-#res <- dem[[1]]
+# res <- dem[[1]]
 #res <- dem_extended[,1:(ncol(dem_extended)-59), drop=FALSE]
 rast_dim <- dim(res)
 preds <- py$res_np
@@ -612,7 +614,7 @@ preds <- preds[1:rast_dim[1],1:rast_dim[2]]
 values(res) <- preds
 plot(res)
 
-x <- read.csv(paste(data_folder, "standardization.csv", sep=""))
+x <- read.csv("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/prec/standardization.csv")
 
 unstand_mean <- x[[3]][1]
 unstand_std <- x[[4]][1]
@@ -623,15 +625,17 @@ plot(res_us)
 # final <- mask(res_us, land_mask, maskvalues=FALSE)
 # plot(final)
 
-writeCDF(res_us, paste0(results_folder, "sep_fullregion.nc"), varname='tmax', overwrite = T)
+writeCDF(res, paste0(results_folder, "jun_fullregion_ext.nc"), varname='prec', overwrite = T)
 
 # use Susans maps as a mask
-cropped <- crop(res_us, sbeale)
-mask_aligned <- resample(sbeale, cropped, method="near")
-final <- mask(cropped, mask_aligned)
+land_mask <- dem_extended > 0
+final <- mask(res_us, land_mask, maskvalues = FALSE)
+# cropped <- crop(res_us, sbeale)
+# mask_aligned <- resample(sbeale, cropped, method="near")
+# final <- mask(cropped, mask_aligned)
 plot(final)
 
-writeCDF(final, paste0(results_folder, "sep_fullregion_masked.nc"), varname='tmax', overwrite = T)
+writeCDF(final, paste0(results_folder, "jun_fullregion_ext_masked.nc"), varname='prec', overwrite = T)
 ```
 
 ### Tile station data:
