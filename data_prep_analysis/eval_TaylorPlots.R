@@ -80,21 +80,22 @@ plot(region4, add=T, border="red")
 ## 
 #######################
 
-datasets <- c("climr", "fm", "sp")
-datasets.names <- c("climr", "Foundational", "Specialized")
+datasets <- c("climr", "fm", "sp", "db")
+datasets.names <- c("climr", "Foundational", "Specialized", "Debiased")
 
 monthpair <- c(4,10)
 monthpair <- c(1,7)
 monthpair <- c(6,12)
 
-png(filename=paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Figures/GanEval.TaylorPlots", paste(month.abb[monthpair], collapse = ""), "png",sep="."), type="cairo", units="in", width=9, height=6.25, pointsize=10, res=600)
-par(mfrow=c(2,3), mar=c(0,0,0,0), mgp=c(2,0.25, 0), tck=-0.01)
-m=1
-for(m in monthpair){
+# STANDARD loop for a six-panel plot (uncomment the for loops and deactivate the alternative single-panel figure)
+# png(filename=paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Figures/GanEval.TaylorPlots", paste(month.abb[monthpair], collapse = ""), "png",sep="."), type="cairo", units="in", width=9, height=6.25, pointsize=10, res=600)
+# par(mfrow=c(2,3), mar=c(0,0,0,0), mgp=c(2,0.25, 0), tck=-0.01)
+m=6
+# for(m in monthpair){ 
   monthcode = monthcodes[m]
   
   e=3
-  for(e in 1:3){
+  # for(e in 1:3){
     element = elements[e]
     
     # load the source STATION data for the BC prism
@@ -108,34 +109,34 @@ for(m in monthpair){
     stn.info <- stn.info[is.finite(stn.data),]
     stn.data <- stn.data[is.finite(stn.data)]
     
-    ###########################################################
-    ## plot a key map
-    #######################
-    
-    if(m==1){
-      png(filename=paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Figures/GanEval.KeyMap", elements[e],"png",sep="."), type="cairo", units="in", width=6.5, height=5.8, pointsize=10, res=600)
-      par(mar=c(0,0,0,0))
-      legend.args=list(text='Elevation (m)', side=2, font=2, line=0.5, cex=0.8)
-      lim <- quantile(values(X), 0.99)
-      values(X)[which(values(X)>lim)] <- lim
-      # plot(hill, col=alpha(grey(0:100/100), 1), maxpixels=ncell(hill), legend=F)
-      plot(X, col=terrain.colors(99), xaxt="n", yaxt="n")
-      plot(crop(hill,X), add=T, col=alpha(grey(0:100/100), 0.5), legend=F, legend.mar=0)
-      plot(oceanmask, add=T, col="white", border=F)
-      # plot(bc, add=T)
-      plot(stn, add=T, pch=16, col="gray50", cex=0.8, lwd=0.5)
-      # mtext(paste("(a)", sep=""), side=1, line=-1.5, adj=0.005, font=2, cex=0.8)
-      
-      for(i in 1:length(regions)){
-        region <- get(paste("region", i, sep=""))
-        plot(region, add=T, lty=2, lwd=2)
-        text(if(i==5) -120 else ext(region)[2], ext(region)[4]-0.5, regions[i], font=2, pos=2, offset=0.1)
-      }
-      l <- ext(X)
-      rect(l[1], l[3], l[2], l[4], border = "black", lwd = 1)
-      
-      dev.off()
-    }
+    # ###########################################################
+    # ## plot a key map
+    # #######################
+    # 
+    # if(m==1){
+    #   png(filename=paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Figures/GanEval.KeyMap", elements[e],"png",sep="."), type="cairo", units="in", width=6.5, height=5.8, pointsize=10, res=600)
+    #   par(mar=c(0,0,0,0))
+    #   legend.args=list(text='Elevation (m)', side=2, font=2, line=0.5, cex=0.8)
+    #   lim <- quantile(values(X), 0.99)
+    #   values(X)[which(values(X)>lim)] <- lim
+    #   # plot(hill, col=alpha(grey(0:100/100), 1), maxpixels=ncell(hill), legend=F)
+    #   plot(X, col=terrain.colors(99), xaxt="n", yaxt="n")
+    #   plot(crop(hill,X), add=T, col=alpha(grey(0:100/100), 0.5), legend=F, legend.mar=0)
+    #   plot(oceanmask, add=T, col="white", border=F)
+    #   # plot(bc, add=T)
+    #   plot(stn, add=T, pch=16, col="gray50", cex=0.8, lwd=0.5)
+    #   # mtext(paste("(a)", sep=""), side=1, line=-1.5, adj=0.005, font=2, cex=0.8)
+    #   
+    #   for(i in 1:length(regions)){
+    #     region <- get(paste("region", i, sep=""))
+    #     plot(region, add=T, lty=2, lwd=2)
+    #     text(if(i==5) -120 else ext(region)[2], ext(region)[4]-0.5, regions[i], font=2, pos=2, offset=0.1)
+    #   }
+    #   l <- ext(X)
+    #   rect(l[1], l[3], l[2], l[4], border = "black", lwd = 1)
+    #   
+    #   dev.off()
+    # }
     
     #################################
     ## Taylor plots
@@ -148,8 +149,12 @@ for(m in monthpair){
     fm <- rast(paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Tirion/Results/foundational_model/", elements[e], "/Model4/", tolower(month.abb[m]), "/", tolower(month.abb[m]), "_fullregion_masked.nc", sep=""))
     if(e==3) fm <- expm1(fm) # TEMPORARY UNTIL TIRION PRODUCES RESULTS IN MM/MONTH.
     
+    # load the debiased model
+    db <- rast(paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Tirion/Results/foundational_model/", elements[e], "/Model4/", tolower(month.abb[m]), "/spec1/debias/", tolower(month.abb[m]), "_fullregion_masked.nc", sep=""))
+    if(e==3) db <- expm1(db) # TEMPORARY UNTIL TIRION PRODUCES RESULTS IN MM/MONTH.
+    
     # optional loop for comparing generators from different epochs
-    epochs <- seq(50,250,50)
+    epochs <- c(10, 20, 30, 40, seq(50,250,50))
     for(epoch in epochs){
       
       # load the specialized model
@@ -158,15 +163,15 @@ for(m in monthpair){
       
       
       # ALTERNATIVE: plot a single taylor plot. 
-      png(filename=paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Figures/GanEval.TaylorPlot", elements[e], month.abb[m], "gen250", "png",sep="."), type="cairo", units="in", width=5, height=5, pointsize=10, res=600)
+      png(filename=paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Figures/GanEval.TaylorPlot", elements[e], month.abb[m], paste0("gen", epoch), "png",sep="."), type="cairo", units="in", width=5, height=5, pointsize=10, res=600)
       par(mfrow=c(1,1), mar=c(2,2,1,1), mgp=c(2,0.25, 0), tck=-0.01)
       
-      taylor.diagram(ref = 0:5, model = 0:5, main = paste(month.name[m], element.names[e]),
+      taylor.diagram(ref = 0:5, model = 0:5, main = paste(month.name[m], element.names[e], "- epoch", epoch),
                      col = "black", pch = 1, cex = 1, normalize = TRUE, xlab="",
                      sd.arcs = TRUE, grad.corr.lines = TRUE, pos.cor = TRUE)
       
       colScheme <- c("black", "dodgerblue", "yellow", "red", "pink")
-      pointScheme <- c(21, 22, 24)
+      pointScheme <- c(21, 22, 24, 23)
       
       # Add a legend
       legend("topright",
@@ -210,7 +215,10 @@ for(m in monthpair){
           # taylor.diagram(ref = stn.values, model = stn.temp, add = TRUE,
           #                col = colScheme[d], pch = c(16,15,17)[r], cex = 1.2, normalize = TRUE, pcex=1.5)
           taylor.diagram.filled(ref = stn.values, model = stn.temp, add = TRUE,
-                                bg = colScheme[r], pch = c(21,22,24)[d], cex = 1.5, normalize = TRUE)
+                                bg = colScheme[r], pch = pointScheme[d], cex = 1.5, normalize = TRUE)
+          
+          text(stn.values,stn.temp, stn.crop$St_ID)
+          
         }
         
         # print(paste("region", i))
@@ -219,9 +227,9 @@ for(m in monthpair){
       dev.off() # ALTERNATIVE: for plotting a single month. 
       
       print(epoch)
-    }
-    print(element)
-  }
-  print(month.abb[m])
-}
-dev.off() #STANDARD: for plotting multiple months
+    } # end of optional loop for comparing epochs
+#     print(element)
+#   }
+#   print(month.abb[m])
+# }
+# dev.off() #STANDARD: for plotting multiple months
