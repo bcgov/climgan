@@ -40,8 +40,8 @@ for(e in 2:length(elements)){
     clim.v1 <- rast(paste("//objectstore2.nrs.bcgov/ffec/Climatologies/climr_mosaic/climr_mosaic_1981_2010_", c("Tmin", "Tmax", "Pr")[e], monthcodes[m], ".tif", sep=""))
     name.v1 <- "climr mosaic"
 
-    clim.v2 <- rast(paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Tirion/Results/foundational_model/", elements[e], "/Model4/", tolower(month.abb[m]), "/spec1/", tolower(month.abb[m]), "_fullregion_masked.nc", sep=""))
-    name.v2 <- "fm4-s1"
+    clim.v2 <- rast(paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Tirion/Results/foundational_model/", elements[e], "/Model4/", tolower(month.abb[m]), "/", tolower(month.abb[m]), "_fullregion_masked.nc", sep=""))
+    name.v2 <- "fm4"
     if(e==3) clim.v2 <- expm1(clim.v2) # TEMPORARY UNTIL TIRION PRODUCES RESULTS IN MM/MONTH.
     
     # -------------------------------
@@ -56,10 +56,10 @@ for(e in 2:length(elements)){
     stn <- stn.info[,get(month.abb[m])]
     stn <- if(e==3) log2(stn) else stn/10
     
-    par(mar=c(3,3,1,1))
-    plot(stn.info[, c("Long", "Lat")], col="grey", pch=16)
-    plot(bdy.bc, add=T, lwd=0.5)
-    
+    # par(mar=c(3,3,1,1))
+    # plot(stn.info[, c("Long", "Lat")], col="grey", pch=16)
+    # plot(bdy.bc, add=T, lwd=0.5)
+
     # calculate distances between stations, for point size during plotting
     library(FNN)
     ## reproject coordinates to km using a cosine(latitude) transformation of longitude in order to approximate the convergence of longitudes. NB this only works over short distances. 
@@ -91,7 +91,7 @@ for(e in 2:length(elements)){
     if(e==3) ColScheme <- rev(ColScheme)
     
     # plot GAN error relative to station normals
-    png(filename=paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Tirion/Results/foundational_model/", elements[e], "/Model1/maps/Error_", elements[e], "_", monthcodes[m], "_", name.v2, ".png", sep=""), type="cairo", units="in", width=8, height=4, pointsize=8, res=600)
+    png(filename=paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Figures/ErrorMap_", name.v2, "_", elements[e], "_", monthcodes[m], ".png", sep=""), type="cairo", units="in", width=8, height=4, pointsize=8, res=600)
     par(mar=c(0.25,0.25, 0.25,0.25), mfrow=c(1,2))
     
     v <- "v1"
@@ -137,7 +137,7 @@ for(e in 2:length(elements)){
   # -----------------------------------------
   # map prediction error
   
-  m=1
+  m=6
   for(m in 1:12){
     
     clim.v1 <- rast(paste("//objectstore2.nrs.bcgov/ffec/Climatologies/climr_mosaic/climr_mosaic_1981_2010_", c("Tmin", "Tmax", "Pr")[e], monthcodes[m], ".tif", sep=""))
@@ -147,8 +147,12 @@ for(e in 2:length(elements)){
     name.v2 <- "v2025f4"
     if(e==3) clim.v2 <- expm1(clim.v2) # TEMPORARY UNTIL TIRION PRODUCES RESULTS IN MM/MONTH.
     
-    clim.v3 <- rast(paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Tirion/Results/foundational_model/", elements[e], "/Model4/", tolower(month.abb[m]), "/spec1/gen250/", tolower(month.abb[m]), "_fullregion_masked.nc", sep=""))
-    name.v3 <- "v2025f4s1"
+    # clim.v3 <- rast(paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Tirion/Results/foundational_model/", elements[e], "/Model4/", tolower(month.abb[m]), "/spec1/gen250/", tolower(month.abb[m]), "_fullregion_masked.nc", sep=""))
+    # name.v3 <- "v2025f4s1"
+    # if(e==3) clim.v3 <- expm1(clim.v3) # TEMPORARY UNTIL TIRION PRODUCES RESULTS IN MM/MONTH.
+    
+    clim.v3 <- rast(paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Tirion/Results/foundational_model/", elements[e], "/Model4/", tolower(month.abb[m]), "/spec1/debias/", tolower(month.abb[m]), "_fullregion_masked.nc", sep=""))
+    name.v3 <- "v2025f4s1d1"
     if(e==3) clim.v3 <- expm1(clim.v3) # TEMPORARY UNTIL TIRION PRODUCES RESULTS IN MM/MONTH.
     
     # -------------------------------
@@ -197,7 +201,7 @@ for(e in 2:length(elements)){
     if(e==3) ColScheme <- rev(ColScheme)
     
     # plot GAN error relative to station normals
-    png(filename=paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Figures/ErrorMap_", elements[e], "_", monthcodes[m], "_", name.v3, ".png", sep=""), type="cairo", units="in", width=10, height=4, pointsize=8, res=600)
+    png(filename=paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Figures/ErrorMap_", elements[e], "_", monthcodes[m], "_", name.v3, "debias.png", sep=""), type="cairo", units="in", width=10, height=4, pointsize=8, res=600)
     par(mar=c(0.25,0.25, 0.25,0.25), mfrow=c(1,3))
     
     v <- "v1"
