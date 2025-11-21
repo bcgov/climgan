@@ -27,6 +27,22 @@ def load_preprocessed():
     fine_test = torch.load(data_folder + "prism_tiles_3001.pt")[:3000,...].unsqueeze(1)
     hrcov_train = torch.load(data_folder + "dem_tiles_3001.pt")[:3000,...].unsqueeze(1)
     hrcov_test = torch.load(data_folder + "dem_tiles_3001.pt")[:3000,...].unsqueeze(1)
+    
+    if(config.DEBIAS): #remove tiles without any stations
+      na_mask = ~torch.isnan(fine_train)
+      stn_ind = torch.sum(na_mask, dim = (1,2,3))
+      have_stns = torch.nonzero(stn_ind).squeeze()
+      fine_train = fine_train[have_stns,...]
+      coarse_train = coarse_train[have_stns,...]
+      hrcov_train = hrcov_train[have_stns,...]
+      
+      na_mask = ~torch.isnan(fine_test)
+      stn_ind = torch.sum(na_mask, dim = (1,2,3))
+      have_stns = torch.nonzero(stn_ind).squeeze()
+      fine_test = fine_test[have_stns,...]
+      coarse_test = coarse_test[have_stns,...]
+      hrcov_test = hrcov_test[have_stns,...]
+      
     return coarse_train, fine_train, coarse_test, fine_test, hrcov_train, hrcov_test
 
 
@@ -60,6 +76,13 @@ class StageData:
         # Define optimizers
         self.G_optimizer = torch.optim.Adam(self.generator.parameters(), hp.lr, betas=(0.9, 0.99))
         self.C_optimizer = torch.optim.Adam(self.critic.parameters(), hp.lr, betas=(0.9, 0.99))
+        
+        if(config.DEBIAS):
+          checkpoint = torch.load(data_folder + "Checkpoint_250.pth", map_location=config.device)
+          self.generator.load_state_dict(checkpoint["generator_state_dict"])
+          self.critic.load_state_dict(checkpoint["critic_state_dict"])
+          self.G_optimizer.load_state_dict(checkpoint["g_optimizer_state_dict"])
+          self.C_optimizer.load_state_dict(checkpoint["c_optimizer_state_dict"])
 
         # Set up the run
         # Define the mlflow experiment drectories

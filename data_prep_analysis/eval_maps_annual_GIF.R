@@ -83,7 +83,8 @@ for(v in c(2024, 2025)){ # maps for both generations of the emulator(Susan=2024;
       png(filename=paste("O:/Mosaic_Yukon/Tirion/Results/foundational_model/", elements[e], "/Model2/maps/GIF/v", v, "_", elements[e], "_", monthcodes[m], ".png", sep=""), type="cairo", units="in", width=8, height=8, pointsize=12, res=600)
       par(mfrow=c(1,1), mar=c(0,0,0,0))
       plot(comp_crop, col=ColScheme, breaks=breaks, legend=F, main="", axes=F, maxcell=ncell(comp_crop), mar=NA)
-      #legend_ramp(comp, title = paste("1981-2010", month.name[m], element.names[e]), ColScheme = ColScheme, breaks = breaks, pos=c(0.2, 0.23, 0.05, 0.45), log = if(e==3) 2 else NULL, horizontal = FALSE, title.height = if(e==3) 1 else 2)
+      # legend_ramp(comp, title = paste("1981-2010", month.name[m], element.names[e]), ColScheme = ColScheme, breaks = breaks, pos=c(0.2, 0.23, 0.05, 0.45), log = if(e==3) 2 else NULL, horizontal = FALSE, title.height = if(e==3) 1 else 2)
+      legend_ramp(comp, title = "", ColScheme = ColScheme, breaks = breaks, pos = c(0.2, 0.21, 0.4, 0.6), horizontal = FALSE, log = if(e==3) 2 else NULL, title.height = if(e==3) 1 else 2)
       dev.off()
       
       print(monthcodes[m])  
@@ -94,10 +95,10 @@ for(v in c(2024, 2025)){ # maps for both generations of the emulator(Susan=2024;
 }
 
 # make the GIF
-files <- sprintf("O:/Mosaic_Yukon/Tirion/Results/foundational_model/tmax/Model1/maps/GIF/v2025_tmax_%02d.png", 1:12)
+files <- sprintf("O:/Mosaic_Yukon/Tirion/Results/foundational_model/tmax/Model2/maps/GIF/v2025_tmax_%02d.png", 1:12)
 
 imgs <- image_read(files)
 
 gif <- image_animate(imgs, fps = 1)
 
-image_write(gif, "O:/Mosaic_Yukon/Tirion/Results/foundational_model/tmax/Model1/maps/GIF/tmax_2025.gif")
+image_write(gif, "O:/Mosaic_Yukon/Tirion/Results/foundational_model/tmax/Model2/maps/GIF/tmax_2025.gif")

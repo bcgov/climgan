@@ -59,6 +59,13 @@ def gen_batch_and_log_metrics(G, C, coarse, real, invariant, d):
         fake = G(coarse).detach()
     else:
         fake = G(coarse,invariant).detach()
+        
+    if(config.DEBIAS):
+      gen_stn = fake[~torch.isnan(real)]
+      real_stn = real[~torch.isnan(real)]
+      cont_loss = content_loss(gen_stn, real_stn, device=config.device)
+      d["MAE_0"].append(cont_loss.detach().cpu().item())
+      return(d)
 
     creal = torch.mean(C(real,invariant,coarse)).detach()
     cfake = torch.mean(C(fake,invariant,coarse)).detach()

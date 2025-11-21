@@ -74,6 +74,21 @@ class WassersteinGAN:
 
         # Update the generator
         self.G_optimizer.step()
+        
+     def _generator_train_debias(self, coarse, fine, invariant, iteration):
+        self.G_optimizer.zero_grad()
+        fake = self.G(coarse, invariant) ##generate fake image from generator
+        c_fake = self.C(fake,invariant,coarse)
+
+        gen_stn = fake[~torch.isnan(fine)]
+        real_stn = fine[~torch.isnan(fine)]
+        cont_loss = content_loss(gen_stn, real_stn, device=config.device)
+        g_loss = -torch.mean(c_fake) * hp.gamma + hp.content_lambda * cont_loss   
+  
+        g_loss.backward()
+
+        # Update the generator
+        self.G_optimizer.step()
 
     def _gp(self, real, fake, critic, coarse, invariant):
         current_batch_size = real.size(0)
@@ -125,10 +140,13 @@ class WassersteinGAN:
             fine = data[1]
             invariant = data[2]
             
-            self._critic_train_iteration(coarse, fine, invariant)
+            if(config.DEBIAS):
+              self._generator_train_debias(coarse, fine, invariant, epoch)
+            else:
+              self._critic_train_iteration(coarse, fine, invariant)
 
-            if self.num_steps%hp.critic_iterations == 0:
-                self._generator_train_iteration(coarse, fine, invariant, epoch)
+              if self.num_steps%hp.critic_iterations == 0:
+                  self._generator_train_iteration(coarse, fine, invariant, epoch)
 
             # Track train set metrics
             train_metrics = gen_batch_and_log_metrics(
