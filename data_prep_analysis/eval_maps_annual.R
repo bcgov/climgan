@@ -15,7 +15,7 @@ elements <- c("tmax")
 element.names <- c("mean\ndaily maximum temperature (\u00b0C)")
 
 v <- 2025
-for(v in c(2024, 2025)){ # maps for both generations of the emulator(Susan=2024; tirion=2025)
+# for(v in c(2024, 2025)){ # maps for both generations of the emulator(Susan=2024; tirion=2025)
 
   #-----------------------
   #determine a common colour scale for all months of each element
@@ -29,7 +29,7 @@ for(v in c(2024, 2025)){ # maps for both generations of the emulator(Susan=2024;
         dir <- paste0("O:/Mosaic_Yukon/operational/WorldClim/", elements[e], "/", tolower(month.abb[m]), "/Predictions/")
         comp <- rast(paste(dir, list.files(dir, pattern=".*.nc"), sep=""))
       } else {
-        comp <- rast(paste("O:/Mosaic_Yukon/Tirion/Results/foundational_model/", elements[e], "/Model1/", tolower(month.abb[m]), "/", tolower(month.abb[m]), "_fullregion_masked.nc", sep=""))
+        comp <- rast(paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Tirion/Results/foundational_model/", elements[e], "/Model4/", tolower(month.abb[m]), "/spec1/gen",epoch,"/", tolower(month.abb[m]), "_fullregion_masked.nc", sep=""))
       }
       if(elements[e]=="prec") values(comp) <- log2(values(comp))
       
@@ -59,7 +59,7 @@ for(v in c(2024, 2025)){ # maps for both generations of the emulator(Susan=2024;
         dir <- paste0("O:/Mosaic_Yukon/operational/WorldClim/", c("tmin", "tmax", "prec")[e], "/", tolower(month.abb[m]), "/Predictions/")
         comp <- rast(paste(dir, list.files(dir, pattern=".*.nc"), sep=""))
       } else {
-        comp <- rast(paste("O:/Mosaic_Yukon/Tirion/Results/foundational_model/", elements[e], "/Model1/", tolower(month.abb[m]), "/", tolower(month.abb[m]), "_fullregion_masked.nc", sep=""))
+        comp <- rast(paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Tirion/Results/foundational_model/", elements[e], "/Model4/", tolower(month.abb[m]), "/spec1/gen",epoch,"/", tolower(month.abb[m]), "_fullregion_masked.nc", sep=""))
       }
       
       if(elements[e]=="prec") values(comp) <- log2(values(comp))
@@ -90,5 +90,5 @@ for(v in c(2024, 2025)){ # maps for both generations of the emulator(Susan=2024;
     }
     print(elements[e])
   }
-  print(v)
-}
+  # print(v)
+# }

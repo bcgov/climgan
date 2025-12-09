@@ -36,7 +36,7 @@ aspect <- terrain(dem, v = "aspect", unit = "radians")
 hill <- shade(slope, aspect, angle = 40, direction = 270)
 
 bdy.bc <- vect(bc_bound())
-bdy.bc <- project(bc, dem.bc)
+bdy.bc <- project(bdy.bc, dem.bc)
 
 # Create an ocean mask
 maskarea <- studyarea+c(4,4,4,4)
@@ -80,22 +80,25 @@ plot(region4, add=T, border="red")
 ## 
 #######################
 
-datasets <- c("climr", "fm", "sp", "db")
-datasets.names <- c("climr", "Foundational", "Specialized", "Debiased")
+# datasets <- c("climr", "fm", "sp", "db")
+# datasets.names <- c("climr", "Foundational", "Specialized", "Debiased")
+
+datasets <- c("climr", "fm", "sp")
+datasets.names <- c("climr", "Foundational", "Specialized")
 
 monthpair <- c(4,10)
 monthpair <- c(1,7)
-monthpair <- c(6,12)
+# monthpair <- c(6,12)
 
 # STANDARD loop for a six-panel plot (uncomment the for loops and deactivate the alternative single-panel figure)
-# png(filename=paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Figures/GanEval.TaylorPlots", paste(month.abb[monthpair], collapse = ""), "png",sep="."), type="cairo", units="in", width=9, height=6.25, pointsize=10, res=600)
-# par(mfrow=c(2,3), mar=c(0,0,0,0), mgp=c(2,0.25, 0), tck=-0.01)
+png(filename=paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Figures/GanEval.TaylorPlots", paste(month.abb[monthpair], collapse = ""), "png",sep="."), type="cairo", units="in", width=9, height=6.25, pointsize=10, res=600)
+par(mfrow=c(2,3), mar=c(0,0,0,0), mgp=c(2,0.25, 0), tck=-0.01)
 m=6
-# for(m in monthpair){ 
+for(m in monthpair){
   monthcode = monthcodes[m]
   
-  e=3
-  # for(e in 1:3){
+  e=1
+  for(e in 1:3){
     element = elements[e]
     
     # load the source STATION data for the BC prism
@@ -149,87 +152,84 @@ m=6
     fm <- rast(paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Tirion/Results/foundational_model/", elements[e], "/Model4/", tolower(month.abb[m]), "/", tolower(month.abb[m]), "_fullregion_masked.nc", sep=""))
     if(e==3) fm <- expm1(fm) # TEMPORARY UNTIL TIRION PRODUCES RESULTS IN MM/MONTH.
     
-    # load the debiased model
-    db <- rast(paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Tirion/Results/foundational_model/", elements[e], "/Model4/", tolower(month.abb[m]), "/spec1/debias/", tolower(month.abb[m]), "_fullregion_masked.nc", sep=""))
-    if(e==3) db <- expm1(db) # TEMPORARY UNTIL TIRION PRODUCES RESULTS IN MM/MONTH.
-    
+    # # load the debiased model
+    # db <- rast(paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Tirion/Results/foundational_model/", elements[e], "/Model4/", tolower(month.abb[m]), "/spec1/debias/", tolower(month.abb[m]), "_fullregion_masked.nc", sep=""))
+    # if(e==3) db <- expm1(db) # TEMPORARY UNTIL TIRION PRODUCES RESULTS IN MM/MONTH.
+
     # optional loop for comparing generators from different epochs
     epochs <- c(10, 20, 30, 40, seq(50,250,50))
-    for(epoch in epochs){
+    epoch = 50
+    # for(epoch in epochs){
+    
+    # load the specialized model
+    sp <- rast(paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Tirion/Results/foundational_model/", elements[e], "/Model4/", tolower(month.abb[m]), "/spec1/gen",epoch,"/", tolower(month.abb[m]), "_fullregion_masked.nc", sep=""))
+    if(e==3) sp <- expm1(sp) # TEMPORARY UNTIL TIRION PRODUCES RESULTS IN MM/MONTH.
+
+    # ALTERNATIVE: plot a single taylor plot. 
+    # png(filename=paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Figures/GanEval.TaylorPlot", elements[e], month.abb[m], paste0("gen", epoch), "png",sep="."), type="cairo", units="in", width=5, height=5, pointsize=10, res=600)
+    # par(mfrow=c(1,1), mar=c(2,2,1,1), mgp=c(2,0.25, 0), tck=-0.01)
+    
+    taylor.diagram(ref = 0:5, model = 0:5, main = paste(month.name[m], element.names[e], "- epoch", epoch),
+                   col = "black", pch = 1, cex = 1, normalize = TRUE, xlab="",
+                   sd.arcs = TRUE, grad.corr.lines = TRUE, pos.cor = TRUE)
+    
+    colScheme <- c("black", "dodgerblue", "yellow", "red", "pink")
+    pointScheme <- c(21, 22, 24, 23)
+    
+    # Add a legend
+    legend("topright",
+           legend = regions,
+           title="Regions",
+           fill = colScheme,      # colored boxes
+           border = NULL,
+           bty = "n",
+           inset = c(0,-0.07))
+    
+    # second column: black shapes
+    legend("topright",
+           legend = datasets.names,
+           title="Datasets",
+           bg = "white",
+           pch = pointScheme,  # shapes
+           pt.cex = 1.5,
+           bty = "n",
+           inset = c(0.3,-0.07))   # shift to the left so they appear in second column
+    
+    for(r in 1:length(regions)){
+      region <- get(paste("region", r, sep="")) 
+      crs(region) <- "EPSG:4326"
       
-      # load the specialized model
-      sp <- rast(paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Tirion/Results/foundational_model/", elements[e], "/Model4/", tolower(month.abb[m]), "/spec1/gen",epoch,"/", tolower(month.abb[m]), "_fullregion_masked.nc", sep=""))
-      if(e==3) sp <- expm1(sp) # TEMPORARY UNTIL TIRION PRODUCES RESULTS IN MM/MONTH.
+      stn.vect <- vect(stn.info, geom = c("Long", "Lat"), crs = "EPSG:4326")
+      stn.crop <- crop(stn.vect, region)
+      stn.values <- as.data.frame(stn.crop)[,which(names(stn.crop)==month.abb[m])]
+      stn.values <- if(e==3) log2(stn.values) else stn.values/10
       
-      
-      # ALTERNATIVE: plot a single taylor plot. 
-      png(filename=paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Figures/GanEval.TaylorPlot", elements[e], month.abb[m], paste0("gen", epoch), "png",sep="."), type="cairo", units="in", width=5, height=5, pointsize=10, res=600)
-      par(mfrow=c(1,1), mar=c(2,2,1,1), mgp=c(2,0.25, 0), tck=-0.01)
-      
-      taylor.diagram(ref = 0:5, model = 0:5, main = paste(month.name[m], element.names[e], "- epoch", epoch),
-                     col = "black", pch = 1, cex = 1, normalize = TRUE, xlab="",
-                     sd.arcs = TRUE, grad.corr.lines = TRUE, pos.cor = TRUE)
-      
-      colScheme <- c("black", "dodgerblue", "yellow", "red", "pink")
-      pointScheme <- c(21, 22, 24, 23)
-      
-      # Add a legend
-      legend("topright",
-             legend = regions,
-             title="Regions",
-             fill = colScheme,      # colored boxes
-             border = NULL,
-             bty = "n",
-             inset = c(0,-0.07))
-      
-      # second column: black shapes
-      legend("topright",
-             legend = datasets.names,
-             title="Datasets",
-             bg = "white",
-             pch = pointScheme,  # shapes
-             pt.cex = 1.5,
-             bty = "n",
-             inset = c(0.3,-0.07))   # shift to the left so they appear in second column
-      
-      for(r in 1:length(regions)){
-        region <- get(paste("region", r, sep="")) 
-        crs(region) <- "EPSG:4326"
-        
-        stn.vect <- vect(stn.info, geom = c("Long", "Lat"), crs = "EPSG:4326")
-        stn.crop <- crop(stn.vect, region)
-        stn.values <- as.data.frame(stn.crop)[,which(names(stn.crop)==month.abb[m])]
-        stn.values <- if(e==3) log2(stn.values) else stn.values/10
-        
-        for(dataset in datasets){
-          d=which(datasets==dataset)
-          temp <- get(dataset)
-          temp <- mask(temp, region)
-          # plot(temp)
-          # plot(stn.crop, add=T)
-          stn.temp <- as.vector(unlist(extract(temp, stn.crop)[2]))
-          stn.temp <- if(e==3) log2(stn.temp) else stn.temp
-          assign(paste("stn", dataset, elements[e], monthcodes[m], sep="."), stn.temp)
-          assign(paste("error", dataset, elements[e], monthcodes[m], sep="."), stn.temp - stn.values)
-          # Add points on the Taylor diagram
-          # taylor.diagram(ref = stn.values, model = stn.temp, add = TRUE,
-          #                col = colScheme[d], pch = c(16,15,17)[r], cex = 1.2, normalize = TRUE, pcex=1.5)
-          taylor.diagram.filled(ref = stn.values, model = stn.temp, add = TRUE,
-                                bg = colScheme[r], pch = pointScheme[d], cex = 1.5, normalize = TRUE)
-          
-          text(stn.values,stn.temp, stn.crop$St_ID)
-          
-        }
-        
-        # print(paste("region", i))
+      for(dataset in datasets){
+        d=which(datasets==dataset)
+        temp <- get(dataset)
+        temp <- mask(temp, region)
+        # plot(temp)
+        # plot(stn.crop, add=T)
+        stn.temp <- as.vector(unlist(extract(temp, stn.crop)[2]))
+        stn.temp <- if(e==3) log2(stn.temp) else stn.temp
+        assign(paste("stn", dataset, elements[e], monthcodes[m], sep="."), stn.temp)
+        assign(paste("error", dataset, elements[e], monthcodes[m], sep="."), stn.temp - stn.values)
+        # Add points on the Taylor diagram
+        # taylor.diagram(ref = stn.values, model = stn.temp, add = TRUE,
+        #                col = colScheme[d], pch = c(16,15,17)[r], cex = 1.2, normalize = TRUE, pcex=1.5)
+        taylor.diagram.filled(ref = stn.values, model = stn.temp, add = TRUE,
+                              bg = colScheme[r], pch = pointScheme[d], cex = 1.5, normalize = TRUE)
       }
       
-      dev.off() # ALTERNATIVE: for plotting a single month. 
-      
-      print(epoch)
-    } # end of optional loop for comparing epochs
-#     print(element)
-#   }
-#   print(month.abb[m])
-# }
-# dev.off() #STANDARD: for plotting multiple months
+      # print(paste("region", i))
+    }
+    
+    # dev.off() # ALTERNATIVE: for plotting a single month. 
+    # print(epoch)
+    # } # end of optional loop for comparing epochs
+    
+    print(element)
+  }
+  print(month.abb[m])
+}
+dev.off() #STANDARD: for plotting multiple months
