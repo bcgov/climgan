@@ -1,0 +1,385 @@
+---
+title: "PRISM_Prediction"
+author: "Kiri, Susan"
+format: html
+editor: visual
+---
+
+```{python}
+import torch
+import numpy as np
+import mlflow
+import xarray as xr
+from matplotlib import pyplot as plt
+from matplotlib import colorbar, colors, gridspec
+```
+
+# Stack Covariates
+
+```{r}
+library(terra)
+library(data.table)
+
+data_folder <- "C:/Users/SBEALE/Desktop/GAN Data/tmax/tmax_all_months_nonan/"
+
+hrcovs <- rast(paste0(data_folder,c("dem_large.nc", "lat_large.nc","lon_large.nc","coast_large.nc"), sep = ""))
+
+plot(hrcovs)
+
+wrf <- rast(paste0(data_folder, c("wrf_large.nc"), sep = ''))
+#wrf <- crop(wrf,hrcovs)
+dim(wrf)
+dim(hrcovs)
+plot(wrf)
+
+writeCDF(hrcovs, paste0(data_folder,"hrcovs_cropped.nc"), overwrite = T)
+writeCDF(wrf, paste0(data_folder, "wrf_cropped.nc"), overwrite = T)
+```
+
+# Load Data
+
+```{python}
+data_folder = r.data_folder
+cond_fields = xr.open_dataset(data_folder + "hrcovs_cropped.nc")
+hrcov = torch.from_numpy(cond_fields.to_array().to_numpy())[0,...]
+
+# the shape of this is 2 (var tmax is 0 and month is 1), 12 (month), shape
+wrf_fields = xr.open_dataset(data_folder + "wrf_large.nc")
+wrf2 = torch.from_numpy(wrf_fields.to_array().to_numpy())[...]
+
+plt.close()
+plt.imshow(hrcov[2,...])
+plt.colorbar()
+plt.show()
+
+plt.close()
+plt.imshow(wrf2[1,2,...])
+plt.colorbar()
+plt.show()
+
+wrf2[0][torch.isnan(wrf2[0])] = 0
+```
+
+# Make tiles
+
+```{python}
+import math
+def tile_data(tensor, tile_size, offset):
+  h, w = tensor.size(1), tensor.size(2)
+  res_ls = []
+  for y in range(int(math.ceil(h/offset))-1):
+    for x in range(int(math.ceil(w/offset))-1):
+      curr = tensor[:, offset*y:min(offset*y+tile_size, h), offset*x:min(offset*x+tile_size, w)]
+      if(y == 0):
+        res_ls.append([curr])
+      else:
+        res_ls[x].append(curr)
+  res_pad = [[torch.nn.functional.pad(ten, (0,tile_size-ten.shape[2],0,tile_size - ten.shape[1],0,0), mode = "constant", value = 0) for ten in x] for x in res_ls]
+  return(res_pad)
+	
+scale_factor = 4
+tile_size = 128
+offset = 32
+res_pad = tile_data(hrcov, tile_size, offset)
+mon = wrf2[1]
+wrfmon = wrf2[0]
+
+
+plt.close()
+# torch.Size([34, 22, 4, 128, 128])
+plt.imshow(res_pad[0][-1][2],cmap='viridis')
+plt.colorbar()
+plt.show()
+
+wrf_tile = []
+mon_tile = []
+for i in range(0,12):
+  wrf_tile.append(tile_data(wrfmon[i].unsqueeze(0), int(tile_size/scale_factor), int (offset/scale_factor)))
+  mon_tile.append(tile_data(mon[i].unsqueeze(0), int(tile_size/scale_factor), int (offset/scale_factor)))
+  
+for i in range(0,12):
+  for j in range(0,len(mon_tile[0])):
+    for m in range(0,len(mon_tile[0][0])):
+      mon_tile[i][j][m] = torch.ones(1,32,32)*(i+1)
+
+plt.close()
+plt.imshow(mon_tile[2][0][-1][0,...])
+plt.colorbar()
+plt.show()
+```
+
+```{python}
+wrf_tile = torch.from_numpy(np.array(wrf_tile))
+mon_tile = torch.from_numpy(np.array(mon_tile))
+res_pad = torch.from_numpy(np.array(res_pad))
+
+wrf_mon = torch.cat((wrf_tile, mon_tile), dim=3)
+```
+
+```{python}
+plt.close()
+# torch.Size([12, 34, 22, 2, 32, 32])
+plt.imshow(wrf_mon[2,0,-1,0,...], cmap='viridis')
+plt.colorbar()
+plt.show()
+
+plt.close()
+# torch.Size([34, 22, 5, 128, 128])
+plt.imshow(res_pad[0,-1,2,...], cmap='viridis')
+plt.colorbar()
+plt.show()
+```
+
+`{plt.close()} plt.imshow(wrf_tile[2][4][0,...]) plt.show()`
+
+# Load Model and Predict
+
+```{python}
+G = torch.jit.load("C:/Users/SBEALE/Desktop/Generators/tmax_all_months_nonan_BC/Generator_220.pt")
+device = "cuda"
+wrf_tiles = wrf_mon.unsqueeze(3)
+hrcov_tiles = res_pad.unsqueeze(2)
+preds = []
+for i in range(0,12):
+  preds.append([[G(wrf.to(device).float(),hr.to(device).float()).cpu().detach() for wrf, hr in zip(w1,h1)] for w1,h1 in zip(wrf_tiles[i], hrcov_tiles)])
+```
+
+```{python}
+# preds = torch.from_numpy(np.array(preds))
+
+plt.close()
+plt.imshow(preds[2][4][0,0,...])
+plt.show()
+
+plt.close()
+plt.imshow(preds[2][4][0,0,...])
+plt.show()
+```
+
+# Option 1: Crop and Concat
+
+```{python}
+ncol = len(preds[0])
+nrow = len(preds[0][0])
+pad_size = int((tile_size-offset)/2)
+pred_crop = []
+for i in range(0,12):
+  pred_crop.append([[ten[0,0,pad_size:-pad_size,pad_size:-pad_size] for j,ten in enumerate(x)] for i,x in enumerate(preds[i])])
+
+pred_cols = []
+for i in range(0,12):
+  pred_cols.append([torch.cat(col, dim = 0) for col in pred_crop[i]])
+
+plt.close()
+plt.imshow(pred_cols[2][2])
+plt.show()
+
+final_res = []
+final_pad = []
+for i in range(0,12):
+  x = torch.cat(pred_cols[i], dim = 1)
+  final_res.append(x)
+  final_pad.append(torch.nn.functional.pad(x, (pad_size,pad_size,pad_size,pad_size), mode = "constant", value = 0))
+
+# ncol = len(preds)
+# nrow = len(preds[0])
+# pad_size = int((tile_size-offset)/2)
+# pred_crop = [[ten[0,0,pad_size:-pad_size,pad_size:-pad_size] for j,ten in enumerate(x)] for i,x in enumerate(preds)]
+# 
+# pred_cols = [torch.cat(col, dim = 0) for col in pred_crop]
+# 
+# plt.close()
+# plt.imshow(pred_cols[2])
+# plt.show()
+# 
+# final_res = torch.cat(pred_cols, dim = 1)
+# final_pad = torch.nn.functional.pad(final_res, (pad_size,pad_size,pad_size,pad_size), mode = "constant", value = 0)
+```
+
+# Option 2: Blending
+
+```{python}
+from torch.nn import functional as nnf
+
+ncol = len(preds[0])
+nrow = len(preds[0][0])
+scale_factor = 4
+tile_size = 128
+offset = 96
+pad_size = int((tile_size-offset)/4)
+overlap_size = pad_size * 2
+new_size = tile_size - overlap_size
+
+##crop edges
+pred_crop = []
+for i in range(0,12):
+  pred_crop.append([[ten[0,0,pad_size:-pad_size,pad_size:-pad_size] for j,ten in enumerate(x)] for i,x in enumerate(preds[i])])
+
+###make masks
+t1 = torch.linspace(0,1,overlap_size).repeat(112,1)
+t2 = torch.ones((112,112-(overlap_size*2))) 
+t3 = torch.linspace(1,0,overlap_size).repeat(112,1)
+tile_mask = torch.cat([t1,t2,t3], dim = 1).transpose(0,1)
+
+def blend_row(row_ls):
+  temp = torch.cat([x.reshape(1,new_size**2,1) for x in row_ls],dim = 2)
+  out = nnf.fold(temp, (nrow*offset + overlap_size*2,new_size), kernel_size=(new_size,new_size), stride=offset).squeeze()
+  return out
+
+mask_tiles = []
+pred_cols = []
+for i in range(0,12):
+  ## mask individual tiles
+  y = [[ten * tile_mask for ten in x] for x in pred_crop[i]]
+  mask_tiles.append(y)
+  pred_cols.append([blend_row(x) for x in y])
+
+## make column mask
+col_dims = pred_cols[0][0].shape
+t1 = torch.linspace(0,1,overlap_size).repeat(col_dims[0],1)
+t2 = torch.ones((col_dims[0],112-(overlap_size*2))) 
+t3 = torch.linspace(1,0,overlap_size).repeat(col_dims[0],1)
+column_mask = torch.cat([t1,t2,t3], dim = 1)
+
+mask_cols = []
+for i in range(0,12):
+  mask_cols.append([column_mask * x for x in pred_cols[i]])
+
+##blend and concatenate cols
+result = []
+for i in range(0,12):
+  temp = [x.reshape(1,col_dims[0]*col_dims[1],1) for x in mask_cols[i]]
+  uf = torch.cat(temp, dim = 2)
+  raw = nnf.fold(uf, (col_dims[0],ncol*offset + overlap_size*2), kernel_size=col_dims, stride=offset)
+  result.append(raw.squeeze())
+  
+result = np.array(result)
+
+plt.close()
+plt.imshow(result[11])
+plt.show()
+
+final_pad = nnf.pad(final_res, (pad_size,pad_size,pad_size,pad_size), mode = "constant", value = 0)
+#plt.savefig("Test_Blending.png", dpi = 800)
+```
+
+```{python}
+res_np = np.array(final_pad)
+
+plt.close()
+plt.imshow(res_np[1])
+plt.show()
+
+res_np.shape
+# res_np2 = res_np[:1387,:3260]
+# 
+# plt.savefig("Tiled_Yukon_Jn14.png", dpi = 400)
+```
+
+# Create Raster
+
+```{r}
+library(terra)
+library(data.table)
+library(reticulate)
+
+res <- hrcovs[[1]]
+preds <- py$res_np
+dim(preds)
+dim(res) = c(2144, 3296, 12)
+rast_dim <- dim(res)
+
+for (i in 1:12) {
+  x <- preds[i,1:rast_dim[1],1:rast_dim[2]]
+  values(res[[i]]) <- x
+} 
+
+
+unstand_mean <- 7.0120296
+unstand_std <- 8.533417
+
+res_us <- (res * unstand_std) + (unstand_mean)
+plot(res_us)
+
+res_us <- project(res_us, hrcovs)
+
+writeRaster(res_us, "C:/Users/SBEALE/Desktop/Gan Predictions/GAN_tmax_allmonths_gen220_offset32.tif", overwrite = T)
+
+
+writeCDF(res_us, "C:/Users/SBEALE/Desktop/Gan Predictions/GAN_tmax_allmonths_gen220_offset32.nc", var='tmax', overwrite = T)
+```
+
+## Old
+
+```{python}
+batchsize = 2
+
+all_gens = []
+for j in range(int(wrf.shape[0]/batchsize)):
+  coarse_in = torch.cat(wrf_tiles[(j*batchsize):((j+1)*batchsize)],dim = 0).to(device).float()
+  hr_in = torch.cat(hrcov_tiles[(j*batchsize):((j+1)*batchsize)],dim = 0).to(device).float()
+  gen_out = G(coarse_in, hr_in).cpu().detach()
+  all_gens.append(gen_out)
+  del gen_out
+sr = torch.cat(all_gens, 0)
+
+sr = sr.squeeze()
+sr_ls = list(sr)
+reg_all = rebuild_tensor(sr_ls, hrcov[0,...].unsqueeze(0))
+
+plt.close()
+plt.imshow(reg_all[0,...])
+plt.show()
+plt.savefig("Yukon1.png", dpi = 400)
+sr = sr.squeeze()
+test = sr[0:9,...].reshape((9*128,128))
+test2 = sr[:261,...].reshape((29*128,9*128))
+
+d1ls = []
+for i in range(2):
+  print(i)
+  temp = sr[i*9:(i*9)+9,...]
+  d1ls.append(temp.reshape(9*128,128))
+
+i = 2
+temp = hrcov[18:27,0,...]
+test = temp.reshape(9*128,128)
+reg_all = torch.cat(d1ls, dim = 1)
+
+plt.close()
+plt.imshow(reg_all)
+plt.show()
+plt.savefig("test_prism.png", dpi = 400)
+
+plt.close()
+plt.imshow(d1ls[8])
+plt.show()
+
+data_folder = "../Data/PRISM/yukon/"
+cond_fields = xr.open_dataset(data_folder + "dem_no_tile.nc", engine="netcdf4")
+clat = xr.open_dataset(data_folder + "lat_no_tile.nc", engine="netcdf4")
+clon = xr.open_dataset(data_folder + "lon_no_tile.nc", engine="netcdf4")
+ccoast = xr.open_dataset(data_folder + "coast_no_tile.nc", engine="netcdf4")
+lat = torch.from_numpy(clat.to_array().to_numpy())[0,:]
+lon = torch.from_numpy(clon.to_array().to_numpy())[0,:]
+coast = torch.from_numpy(ccoast.to_array().to_numpy())[0,:]
+dem = torch.from_numpy(cond_fields.to_array().to_numpy())
+dem = dem[0,...]
+
+hrcov = torch.cat([dem.unsqueeze(0), lat.unsqueeze(0), lon.unsqueeze(0), coast.unsqueeze(0)], dim = 0)
+hrcov = hrcov[:,:1280,1236:]
+
+plt.close()
+plt.imshow(hrcov[0,...])
+plt.show()
+
+cond_fields = xr.open_dataset(data_folder + "wrf_no_tile.nc", engine="netcdf4")
+wrf = torch.from_numpy(cond_fields.to_array().to_numpy())[0,:]
+wrf2 = wrf[:320,309:]
+
+plt.close()
+plt.imshow(wrf2)
+plt.colorbar()
+plt.show()
+
+```

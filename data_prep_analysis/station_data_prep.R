@@ -89,7 +89,7 @@ if (var == "ppt") {
 }
 
 # load reference map
-ref_US <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/dem/test area prep/dem_US_test.nc")
+ref_US <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/dem/test area prep/dem_US.nc")
 blank <- rast(ref_US)
 values(blank) <- NA
 
@@ -113,10 +113,10 @@ names(template_US) <- month.abb
 
 usca_merged <- merge(template_CA, template_US)
 
-dem <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/dem/test area prep/dem_stn_test.nc")
+dem <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/dem/test area prep/dem_stn_train.tif")
 usca_final <- project(usca_merged, dem)
 
-writeCDF(usca_final, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/", "ppt_station_data.nc"), varname='prec', overwrite = T)
+writeRaster(usca_final, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/", "ppt_station_data.tif"))
 write.csv(test_stations, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/", "ppt_test_stations.csv"))
 write.csv(eval_stations, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/", "ppt_eval_stations.csv"))
 
@@ -139,15 +139,17 @@ for (i in seq_along(months)) {
 names(template_test) <- month.abb
 writeCDF(template_test, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/", "ppt_station_test_data.nc"), varname='prec', overwrite = T)
 
-# prep prism as training data (add band of NAs along the bottom to match dem ext)
+## ---- PREP PRISM FOR TRAINING AREA (add band of NAs along the bottom to match dem ext)
 prism_dir <- paste("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/prec/")
 dem_dir <- paste("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/dem/test area prep/")
 
-dem <- rast(paste0(dem_dir, "dem_stn_train.nc"))
+dem <- rast(paste0(dem_dir, "dem_stn_train.tif"))
 months <- month.abb
 
 for (i in seq_along(months)) {
   prism <- rast(paste0(prism_dir, months[i], "/prism_train_coarse.nc"))
   prism_stn <- project(prism, dem)
-  writeCDF(prism_stn, paste0(prism_dir, months[i], "/prism_stn_train.nc"), varname='prec', overwrite = T)
+  writeRaster(prism_stn, paste0(prism_dir, months[i], "/prism_stn_train.tif"))
 }
+
+

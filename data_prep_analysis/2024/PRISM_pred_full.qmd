@@ -1,0 +1,307 @@
+---
+title: "PRISM_Prediction"
+author: "Kiri, Susan"
+format: html
+editor: visual
+execute: 
+  python: C:\\Program Files\\Python311\\python.exe
+---
+
+```{r}
+library(reticulate)
+use_python("C:\\Program Files\\Python311\\python.exe", required = TRUE)
+```
+
+```{python}
+import torch
+import numpy as np
+import mlflow
+import xarray as xr
+from matplotlib import pyplot as plt
+from matplotlib import colorbar, colors, gridspec
+import os
+
+
+```
+
+```{python}
+import climgan
+from climgan.networks.prism_generator import Generator
+from climgan.networks.critic_covariates import Critic
+era5 = torch.load("../data/era5_tiles_346.pt")
+dem = torch.load("../data/dem_tiles_346.pt")
+prism = torch.load("../data/prism_tiles_346.pt")
+
+plt.close()
+plt.imshow(prism[42,...])
+plt.show()
+
+plt.close()
+plt.imshow(dem[42,...])
+plt.show()
+
+plt.close()
+plt.imshow(era5[42,...])
+plt.show()
+```
+
+## Test networks
+
+```{python}
+lr_test = era5[:8,...].unsqueeze(1).to("cuda")
+hr_test = prism[:8,...].unsqueeze(1).to("cuda")
+dem_test = dem[:8,...].unsqueeze(1).to("cuda")
+
+critic = Critic(12, 144, 1, 1, 1).to("cuda")
+
+generator = Generator(12, 144, 1, 1, 1).to("cuda:0")
+test = generator(lr_test.to("cuda"),hr_test.to("cuda"))
+
+test2 = critic(hr_test, dem_test, lr_test)
+
+plt.close()
+plt.imshow(test[3,0,...].cpu().detach())
+plt.show()
+
+
+```
+
+# Stack Covariates
+
+```{r}
+reticulate::py_install("climgan")
+library(data.table)
+library(terra)
+```
+
+```{r}
+
+pred_fold <- "//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/operational/worldclim/tmin/dec/Predictions/gen2/"
+data_folder <- "//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/operational/worldclim/tmin/dec/shift16_32/"
+
+cov_folder <- "//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/operational/Covariates/"
+
+
+hrcovs <- rast(paste(cov_folder,c("dem_train.nc", "lat_train.nc","lon_train.nc","coast_train.nc"), sep = ""))
+
+plot(hrcovs)
+
+worldclim <- rast(c(paste(data_folder, "worldclim_train.nc", sep=""), paste(cov_folder, "worldclim_mask_train.nc", sep="")))
+#worldclim <- crop(worldclim,hrcovs)
+dim(worldclim)
+dim(hrcovs)
+plot(worldclim)
+
+writeCDF(hrcovs, paste0(data_folder,"hrcovs_cropped.nc"), overwrite = T)
+writeCDF(worldclim, paste0(data_folder, "worldclim_cropped.nc"), overwrite = T)
+```
+
+# Load Data
+
+```{python}
+data_folder = r.data_folder
+cond_fields = xr.open_dataset(data_folder + "hrcovs_cropped.nc")
+hrcov = torch.from_numpy(cond_fields.to_array().to_numpy())[0,...]
+
+worldclim_fields = xr.open_dataset(data_folder + "worldclim_cropped.nc")
+worldclim2 = torch.from_numpy(worldclim_fields.to_array().to_numpy())[0,...]
+
+plt.close()
+plt.imshow(worldclim2[1])
+plt.show()
+
+prism_fields = xr.open_dataset(data_folder + "prism_train.nc")
+prism = torch.from_numpy(prism_fields.to_array().to_numpy())[0,...]
+
+plt.close()
+plt.imshow(hrcov[0,...])
+plt.show()
+
+plt.close()
+plt.imshow(prism)
+plt.show()
+
+worldclim2[0,torch.isnan(worldclim2[0])] = 0
+
+plt.close()
+plt.imshow(worldclim2[0])
+plt.show()
+```
+
+```{python}
+num = 0
+for i in range(worldclim2.shape[1]):
+    for j in range(worldclim2.shape[2]):
+        m = worldclim2[1,i,j]
+        if ((m != 1.) & (m != 0.)):
+            num+=1
+```
+
+# Make tiles
+
+```{python}
+import math
+def tile_data(tensor, tile_size, offset):
+  h, w = tensor.size(1), tensor.size(2)
+  res_ls = []
+  for y in range(int(math.ceil(h/offset))):
+    for x in range(int(math.ceil(w/offset))):
+      curr = tensor[:, offset*y:min(offset*y+tile_size, h), offset*x:min(offset*x+tile_size, w)]
+      if(y == 0):
+        res_ls.append([curr])
+      else:
+        res_ls[x].append(curr)
+  res_pad = [[torch.nn.functional.pad(ten, (0,tile_size-ten.shape[2],0,tile_size - ten.shape[1],0,0), mode = "constant", value = 0) for ten in x] for x in res_ls]
+  return(res_pad)
+	
+scale_factor = 4
+tile_size = 128
+offset = 32
+res_pad = tile_data(hrcov, tile_size, offset)
+
+worldclim_tile = tile_data(worldclim2[0].unsqueeze(0), int(tile_size/scale_factor), int(offset/scale_factor))
+
+mask_tile = tile_data(worldclim2[1].unsqueeze(0), int(tile_size/scale_factor), int(offset/scale_factor))
+
+plt.close()
+plt.imshow(res_pad[2][4][0,...])
+plt.show()
+
+plt.close()
+plt.imshow(worldclim_tile[2][4][0,...])
+plt.colorbar()
+plt.show()
+```
+
+```{python}
+wc = torch.from_numpy(np.array(worldclim_tile))
+mask = torch.from_numpy(np.array(mask_tile))
+
+worldclim_tile = torch.cat((wc,mask), dim=2)
+```
+
+```{python}
+plt.imshow(worldclim_tile[2,4,0,...])
+plt.colorbar()
+plt.show()
+plt.close()
+```
+
+# Load Model and Predict
+
+```{python}
+G = torch.jit.load("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/operational/worldclim/tmin/dec/Generators/gen2/Generator_100.pt", map_location=torch.device('cuda:0'))
+device = "cuda"
+worldclim_tiles = [[ten.unsqueeze(0) for ten in x] for x in worldclim_tile]
+hrcov_tiles = [[ten.unsqueeze(0) for ten in x] for x in res_pad]
+
+preds = [[G(worldclim.to(device).float(),hr.to(device).float()).cpu().detach() for worldclim, hr in zip(w1,h1)] for w1,h1 in zip(worldclim_tiles, hrcov_tiles)]
+
+#g_script = torch.jit.script(G)
+```
+
+```{python}
+plt.close()
+plt.imshow(prism_tiles[4][4][0,...])
+plt.show()
+
+plt.close()
+plt.imshow(preds[4][4][0,0,...])
+plt.show()
+```
+
+# Option 1: Crop and Concat
+
+```{python}
+ncol = len(preds)
+nrow = len(preds[0])
+pad_size = int((tile_size-offset)/2)
+pred_crop = [[ten[0,0,pad_size:-pad_size,pad_size:-pad_size] for j,ten in enumerate(x)] for i,x in enumerate(preds)]
+
+pred_cols = [torch.cat(col, dim = 0) for col in pred_crop]
+
+plt.close()
+plt.imshow(pred_cols[2])
+plt.show()
+
+final_res = torch.cat(pred_cols, dim = 1)
+final_pad = torch.nn.functional.pad(final_res, (pad_size,pad_size,pad_size,pad_size), mode = "constant", value = 0)
+plt.close()
+plt.imshow(final_pad)
+plt.show()
+# left = [ten[0,0,:,:pad_size] for ten in preds[0]]
+# right = [ten[0,0,:,-pad_size:] for ten in preds[ncol-1]]
+# l_all = torch.cat(left, dim = 0)[pad_size:-pad_size,:]
+# r_all = torch.cat(right, dim = 0)
+# 
+# top = [col[0][0,0,:pad_size,:] for col in preds]
+# bottom = [col[nrow-1][0,0,-pad_size:,:] for col in preds]
+# t_all = torch.cat(top, dim = 1)
+# b_all = torch.cat(bottom, dim = 1)
+# 
+# plt.close()
+# plt.imshow(t_all)
+# plt.show()
+```
+
+```{python}
+res_np = np.array(final_pad)
+
+plt.close()
+plt.imshow(res_np)
+plt.show()
+
+res_np.shape
+# res_np2 = res_np[:1387,:3260]
+# 
+# plt.savefig("Tiled_Yukon_Jn14.png", dpi = 400)
+```
+
+# Create Raster
+
+```{r}
+library(terra)
+library(data.table)
+library(reticulate)
+
+res <- hrcovs[[1]]
+rast_dim <- dim(res)
+preds <- py$res_np
+dim(preds)
+
+preds <- preds[1:rast_dim[1],1:rast_dim[2]]
+values(res) <- preds
+plot(res)
+
+x <- read.csv(paste(data_folder, "standardization.csv", sep=""))
+
+unstand_mean <- x[[3]][1]
+unstand_std <- x[[4]][1]
+
+res_us <- (res * unstand_std) + (unstand_mean)
+plot(res_us)
+
+writeCDF(res_us, paste0(pred_fold, "GAN_gen100.nc"), varname='tmin', overwrite = T)
+```
+
+## Fix pred artifacts (crop to wc)
+
+```{r}
+
+pred <- rast(paste0(pred_fold, "GAN_gen100.nc"))
+plot(pred)
+
+# have to change this
+wc <- rast("C:/Users/SBEALE/Desktop/full_domain/tmin_03_WorldClim_coarse_focal_max_w15.nc")
+plot(wc)
+
+wc.fine <- disagg(wc, fact=4)
+
+pred <- extend(pred, ext(wc.fine))
+
+pred.crop <- ifel(is.na(wc.fine), NA, pred)
+plot(pred.crop)
+
+writeCDF(pred.crop, paste0(pred_fold, "GAN_gen100.nc"), varname='tmin', overwrite=TRUE)
+
+```

@@ -1,0 +1,205 @@
+---
+title: "2025 GAN Runs: Input Data Prep"
+author: "Tirion"
+format: html
+editor: visual
+---
+
+```{r}
+library(data.table)
+library(terra)
+library(rnaturalearth)
+library(raster)
+```
+
+### Create PRISM input data:
+
+```{r}
+dir_ak <- "O:/Climatologies/PRISM_AK/"
+dir_bc <- "O:/Climatologies/PRISM_BC/"
+dir_daymet <- "O:/Climatologies/Daymet/"
+
+# var <- "tmin"
+
+ak_ext <- ext(c(-150, -140.425, 58.625, 71.375))
+bc_ext <- ext(c(-140, -114, 48, 60))
+daymet_ext <- ext(c(-113, -105, 48, 72))
+
+for (month in 1:12) {
+  ak <- rast(paste0(dir_ak, "ak_ppt_1981_2010.", sprintf("%02d", month), ".asc", sep=""))
+  bc <- rast(paste0(dir_bc, "pr_monClim_PRISM_historical_198101-201012_", month, ".tif", sep=""))
+  daymet <- rast(paste0(dir_daymet, "daymet_1981_2010_pr_", sprintf("%02d", month), ".tif", sep=""))
+  crs(ak) = crs(bc)
+  ak_proj <- project(ak, daymet)
+  
+  # crop to area wanted
+  ak_cropped <- crop(ak_proj, ak_ext)
+  daymet_cropped <- crop(daymet, daymet_ext)
+  
+  # merge 
+  full <- merge(ak_cropped, bc, daymet_cropped)
+  writeRaster(full, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/prec/", "prism_train_", month, ".nc", sep=""))
+}
+
+# use CDO commands in PowerShell with the gridfile.txt in the PRISM folder to coarsen and line up with ERA5
+# ex: cdo remapbil,gridfile.txt prism_train.nc prism_coarse_coarse.nc
+```
+
+Find standardization values:
+
+```{r}
+# find yearly mean and st dev
+months <- c("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
+monthly_rasters <- list()
+
+for (month in months) {
+  prism_folder <- paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/prec/", month, "/")
+  prism <- rast(paste(prism_folder, "prism_train_coarse.nc", sep=""))
+  test <- rast(paste0(prism_folder, "prism_test.nc", sep=""))
+  
+  combined <- merge(prism, test)
+  monthly_rasters[[month]] <- combined
+}
+
+all_months <- rast(monthly_rasters)
+
+mean_val <- mean(values(all_months), na.rm = TRUE)
+sd_val <- sd(values(all_months), na.rm = TRUE)
+
+# only need to save log values for prec
+log_mean_val <- mean(log1p(values(all_months)), na.rm = TRUE)
+log_sd_val <- sd(log1p(values(all_months)), na.rm = TRUE)
+
+df <- data.frame(
+  mean = mean_val,
+  sd = sd_val,
+  log_mean = log_mean_val,
+  log_sd = log_sd_val
+)
+
+write.csv(df, "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/prec/standardization.csv", row.names = FALSE)
+```
+
+Create full raster for RF model: (optional)
+
+```{r}
+# create test of full area (including Alaska testing area) for Random FOrest Model
+months <- c("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
+
+for (month in months) {
+  prism_folder <- paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmin/", month, "/")
+  prism <- rast(paste(prism_folder, "prism_train_coarse.nc", sep=""))
+  test <- rast(paste0(prism_folder, "prism_test.nc", sep=""))
+  
+  combined <- merge(prism, test)
+  writeRaster(combined, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmin/", month, "/prism_full.nc", sep=""), overwrite=TRUE)
+}
+```
+
+### Extend PRISM coastlines:
+
+```{r}
+# extend PRISM coast
+extend.coastal <- function(x){
+  x <- focal(x, w=3, fun="mean", na.policy="only") 
+  x <- focal(x, w=5, fun="mean", na.policy="only") 
+  x <- focal(x, w=7, fun="mean", na.policy="only") 
+  x <- focal(x, w=9, fun="mean", na.policy="only") 
+  x <- focal(x, w=11, fun="mean", na.policy="only") 
+  x <- focal(x, w=13, fun="mean", na.policy="only") 
+  x <- focal(x, w=15, fun="mean", na.policy="only") 
+  x <- focal(x, w=17, fun="mean", na.policy="only") 
+  values(x)[!is.finite(values(x))] <- NA
+  return(x)
+}
+
+months <- c("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
+
+for (month in months) {
+  prism_folder <- paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/prec/", month, "/")
+  prism <- rast(paste(prism_folder, "prism_train_coarse.nc", sep=""))
+  
+  # BC coastline
+  prism_bc <- crop(prism, ext(-140,-123,48,60))
+  plot(prism_bc)
+  prism_bc_extended <- extend.coastal(prism_bc)
+  plot(prism_bc_extended)
+  
+  # Territories coastline
+  prism_ab <- crop(prism, ext(-113,-105,65,72))
+  plot(prism_ab)
+  prism_ab_extended <- extend.coastal(prism_ab)
+  plot(prism_ab_extended)
+  
+  # Alaska coastline
+  prism_ak <- crop(prism, ext(-150,-140.8,58,73))
+  plot(prism_ak)
+  prism_ak_extended <- extend.coastal(prism_ak)
+  plot(prism_ak_extended)
+  
+  extended <- merge(prism_bc_extended, prism_ab_extended, prism_ak_extended)
+  plot(extended)
+  extended_aligned <- resample(extended, prism, method = "near")
+  
+  prism_extended <- cover(prism, extended_aligned)
+  writeCDF(prism_extended, paste0(prism_folder, "prism_train_coarse_ext.nc"), varname='prec', overwrite = T)
+  
+  prism_test <- rast(paste(prism_folder, "prism_test.nc", sep=""))
+  prism_test_extended <- extend.coastal(prism_test)
+  writeCDF(prism_test_extended, paste0(prism_folder, "prism_test_ext.nc"), varname='prec', overwrite = T)
+  
+  plot(prism_extended)
+  plot(prism_test_extended)
+}
+```
+
+### Create ocean proximity raster:
+
+```{r}
+dem_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/dem/"
+
+# create the ocean proximity layer
+dem <- rast(paste(dem_folder, "test area prep/dem_stn_test.nc", sep = ""))
+fact=4
+dem.coarse <- aggregate(dem, fact=fact) # you could use a different aggregation factor if this is too coarse
+plot(dem.coarse)
+coastline <- vect(ne_download(scale = 10, type = "coastline", category = "physical", returnclass = "sf"))
+coastline <- crop(coastline, ext(dem))
+coastal <- distance(dem.coarse, coastline, rasterize = TRUE)
+coastal <- disagg(coastal, fact=fact, method="bilinear")
+
+land_mask <- dem
+land_mask[land_mask != 0] <- 1
+land_mask[land_mask == 0] <- NA
+land_mask_resampled <- resample(land_mask, coastal, method="near")
+coastal_masked <- mask(coastal, land_mask_resampled, maskvalue=NA, updatevalue=0)
+plot(coastal_masked)
+
+writeCDF(coastal_masked, paste0(dem_folder, "op_stn_test.nc"), varname='proximity', overwrite=T)
+```
+
+### Extend dem and ocean proximity for predicting:
+
+```{r}
+dem <- rast(paste(dem_folder, "dem_NWNA_coarse.nc", sep = ""))
+
+# extend dem 1 degree south and add band of zeroes
+extended <- ext(ext(dem)[1], ext(dem)[2], ext(dem)[3] - 1, ext(dem)[4])
+dem_extended <- rast(extended, resolution = res(dem), crs = crs(dem))
+values(dem_extended) <- 0
+dem_extended <- merge(dem, dem_extended)
+# writeCDF(dem_extended, paste0(dem_folder, "dem_pred.nc"), overwrite = TRUE)
+
+plot(dem_extended)
+
+ocean_prox <- rast(paste(dem_folder, "op/ocean_proximity_train.nc", sep = ""))
+
+# extend dem 1 degree south and add band of zeroes
+extended <- ext(ext(ocean_prox)[1], ext(ocean_prox)[2], ext(ocean_prox)[3] - 1, ext(ocean_prox)[4])
+op_extended <- rast(extended, resolution = res(ocean_prox), crs = crs(ocean_prox))
+values(op_extended) <- 0
+op_extended <- merge(ocean_prox, op_extended)
+#writeCDF(op_extended, paste0(dem_folder, "op/op_pred.nc"), overwrite = TRUE)
+
+plot(op_extended)
+```

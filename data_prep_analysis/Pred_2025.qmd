@@ -20,6 +20,9 @@ import torch.nn.functional as F
 library(data.table)
 library(terra)
 library(rnaturalearth)
+library(reticulate)
+library(RColorBrewer)
+library(raster)
 ```
 
 ### Extend PRISM coastlines: (DONE)
@@ -191,7 +194,7 @@ plot(coastal_masked)
 # aspect <- terrain(dem, v = "aspect", unit = "degrees")
 # plot(aspect)
 
-writeCDF(coastal_masked, paste0(dem_folder, "op_stn_test.nc"), varname='proximity', overwrite = T)
+writeCDF(coastal_masked, paste0(dem_folder, "op_stn_test.nc"), varname='proximity', overwrite=T)
 #writeCDF(slope, paste0(dem_folder, "slope.nc"), varname='slope', overwrite = T)
 #writeCDF(aspect, paste0(dem_folder, "aspect.nc"), varname='aspect', overwrite = T)
 ```
@@ -574,7 +577,7 @@ torch.save(final_pad, "/sapho/tirion/GANs/results/" + "full_train_generator_250_
 ## Create raster:
 
 ```{python}
-final_pad = torch.load("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/jun/spec1/debias/jun_fullregion_ext.pt")
+final_pad = torch.load("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmin/Model4/dec/spec1/gen50/dec_gen50_fullregion.pt")
 #final_pad1 = F.pad(final_pad, (0, 59), mode="constant", value=0) 
 
 res_np = np.array(final_pad)
@@ -593,15 +596,13 @@ library(reticulate)
 library(RColorBrewer)
 library(raster)
 
-results_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/jun/spec1/debias/"
-
-data_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/prec/jun/"
+results_folder <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmin/Model4/dec/spec1/gen50/"
 
 #sbeale <- rast("O:/Mosaic_Yukon/operational/WorldClim/prec/feb/Predictions/GAN_gen150.nc")
 
 #dem <- rast(paste(dem_folder, "dem_test.nc", sep = ""))
 
-dem_extended <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/dem/test area prep/dem_stn_train.nc")
+dem_extended <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/dem/dem_pred.nc")
 
 res <- dem_extended[[1]]
 # res <- dem[[1]]
@@ -614,10 +615,10 @@ preds <- preds[1:rast_dim[1],1:rast_dim[2]]
 values(res) <- preds
 plot(res)
 
-x <- read.csv("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/prec/standardization.csv")
+x <- read.csv("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmin/standardization.csv")
 
-unstand_mean <- x[[3]][1]
-unstand_std <- x[[4]][1]
+unstand_mean <- x[[1]][1]
+unstand_std <- x[[2]][1]
 
 res_us <- (res * unstand_std) + (unstand_mean)
 plot(res_us)
@@ -625,17 +626,230 @@ plot(res_us)
 # final <- mask(res_us, land_mask, maskvalues=FALSE)
 # plot(final)
 
-writeCDF(res, paste0(results_folder, "jun_fullregion_ext.nc"), varname='prec', overwrite = T)
+writeCDF(res_us, paste0(results_folder, "dec_fullregion.nc"), varname='tmin', overwrite = T)
 
 # use Susans maps as a mask
-land_mask <- dem_extended > 0
-final <- mask(res_us, land_mask, maskvalues = FALSE)
-# cropped <- crop(res_us, sbeale)
-# mask_aligned <- resample(sbeale, cropped, method="near")
-# final <- mask(cropped, mask_aligned)
+# land_mask <- dem_extended > 0
+# final <- mask(res_us, land_mask, maskvalues = FALSE)
+cropped <- crop(res_us, sbeale)
+mask_aligned <- resample(sbeale, cropped, method="near")
+final <- mask(cropped, mask_aligned)
 plot(final)
 
-writeCDF(final, paste0(results_folder, "jun_fullregion_ext_masked.nc"), varname='prec', overwrite = T)
+writeCDF(final, paste0(results_folder, "dec_fullregion_masked.nc"), varname='tmin', overwrite = T)
+```
+
+### Create rasters in a loop:
+
+```{python}
+months = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"]
+# gens = [10, 20, 30, 40, 50]
+
+res_dict = {}
+
+for month in months:
+    res_dict[month] = {}
+    # for gen in gens:
+    #     filename = f"C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmax/Model4/{month}/spec1/gen{gen}/{month}_gen{gen}_fullregion.pt"
+    #     final_pad = torch.load(filename)
+    #     res_np = np.array(final_pad)
+    #     res_dict[month][gen] = res_np
+    filename = f"C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmin/Model4/{month}/{month}_gen250_US.pt"
+    final_pad = torch.load(filename)
+    res_np = np.array(final_pad)
+    res_dict[month] = res_np
+```
+
+```{r}
+months <- tolower(month.abb)
+# gens <- c(10,20,30,40,50)
+
+# dem_extended <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/dem/dem_pred.nc")
+dem_extended <- rast("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/dem/dem_US.nc")
+x <- read.csv("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmin/standardization.csv")
+#sbeale <- rast("O:/Mosaic_Yukon/operational/WorldClim/prec/feb/Predictions/GAN_gen150.nc")
+py_res_dict <- py$res_dict
+
+for (i in seq_along(months)) {
+  # for (j in seq_along(gens)) {
+  #   results_folder <- paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmax/Model4/", months[i], "/spec1/gen", gens[j], "/")
+  #   res <- dem_extended[[1]]
+  #   rast_dim <- dim(res)
+  #   preds <- py_res_dict[[months[i]]][[as.character(gens[j])]]
+  #   dim(preds)
+  # 
+  #   preds <- preds[1:rast_dim[1],1:rast_dim[2]]
+  #   values(res) <- preds
+  # 
+  #   # unstandardize (change for prec!)
+  #   unstand_mean <- x[[1]][1]
+  #   unstand_std <- x[[2]][1]
+  # 
+  #   res_us <- (res * unstand_std) + (unstand_mean)
+  #   plot(res_us)
+  # 
+  #   # only for prec - remove log transform
+  #   final <- res_us
+  #   # values(final) <- expm1(values(res_us))
+  # 
+  #   writeCDF(final, paste0(results_folder, months[i], "_fullregion.nc"), varname='tmax', overwrite = T)
+  # 
+  #   cropped <- crop(final, sbeale)
+  #   mask_aligned <- resample(sbeale, cropped, method="near")
+  #   final1 <- mask(cropped, mask_aligned)
+  #   # land_mask <- dem_extended > 0
+  #   # final1 <- mask(final, land_mask, maskvalues = FALSE)
+  #   plot(final1)
+  # 
+  #   writeCDF(final1, paste0(results_folder, months[i], "_fullregion_masked.nc"), varname='tmax', overwrite = T)
+  # }
+  results_folder <- paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmin/Model4/", months[i], "/")
+  res <- dem_extended[[1]]
+  rast_dim <- dim(res)
+  preds <- py_res_dict[[months[i]]]
+  dim(preds)
+
+  preds <- preds[1:rast_dim[1],1:rast_dim[2]]
+  values(res) <- preds
+
+  # unstandardize (change for prec!)
+  unstand_mean <- x[[1]][1]
+  unstand_std <- x[[2]][1]
+
+  res_us <- (res * unstand_std) + (unstand_mean)
+  plot(res_us)
+
+  # only for prec - remove log transform
+  final <- res_us
+  # values(final) <- expm1(values(res_us))
+
+  writeCDF(final, paste0(results_folder, months[i], "_US.nc"), varname='tmin', overwrite = T)
+
+  # cropped <- crop(final, sbeale)
+  # mask_aligned <- resample(sbeale, cropped, method="near")
+  # final1 <- mask(cropped, mask_aligned)
+  land_mask <- dem_extended > 0
+  final1 <- mask(final, land_mask, maskvalues = FALSE)
+  plot(final1)
+
+  writeCDF(final1, paste0(results_folder, months[i], "_US_masked.nc"), varname='tmin', overwrite = T)
+}
+```
+
+### Blend together US and CA maps:
+
+```{r}
+# function for creating a weight surface for blending climatologies together
+weightSurface <- function(lat, lon, ext){ # ext is c(lon.start, lon.end, lat.start, lat.end)
+  weights.lat <- (lat-ext[4])/(ext[3]-ext[4])
+  weights.lat[weights.lat>1] <- 1
+  weights.lat[weights.lat<0] <- 0
+  weights.lon <- (lon-ext[1])/(ext[2]-ext[1])
+  weights.lon[weights.lon>1] <- 1
+  weights.lon[weights.lon<0] <- 0
+  weights <- weights.lat-weights.lon
+  weights[weights>1] <- 1
+  weights[weights<0] <- 0
+  return(weights)
+}
+
+extend.coastal <- function(x){
+  x <- focal(x, w=3, fun="mean", na.policy="only") 
+  x <- focal(x, w=5, fun="mean", na.policy="only") 
+  x <- focal(x, w=7, fun="mean", na.policy="only") 
+  x <- focal(x, w=9, fun="mean", na.policy="only") 
+  values(x)[!is.finite(values(x))] <- NA
+  return(x)
+}
+
+months <- tolower(month.abb)
+# gens <- c(10,20,30,40,50)
+
+# months <- c("jan")
+# gens <- c(10)
+for (i in seq_along(months)) {
+  # for (j in seq_along(gens)) {
+  #   # read in both rasters and calculate extents
+  #   pred_ca <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/", months[i], "/spec1/gen", gens[j], "/", months[i], "_fullregion_masked.nc"))
+  #   pred_us <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/", months[i], "/spec1/gen", gens[j], "/", months[i], "_US_masked.nc"))
+  #   
+  #   ext_ca <- ext(pred_ca)
+  #   ext_us <- ext(pred_us)
+  #   crop_ca <- crop(pred_ca, ext(ext_ca$xmin, ext_ca$xmax, ext_ca$ymin, ext_ca$ymax))
+  #   crop_us <- crop(pred_us, ext(-148, ext_ca$xmax, ext_us$ymin, 48))
+  #   
+  #   crop_us_ext <- extend.coastal(crop_us)
+  #   
+  #   # extend preferred raster to full area
+  #   full_ext <- ext(ext_ca$xmin, ext_ca$xmax, ext_us$ymin, ext_ca$ymax)
+  #   pred_ca_extended <- extend(crop_ca, full_ext)
+  #   
+  #   # lat and lon rasters
+  #   lon <- init(pred_ca_extended, 'x')
+  #   lat <- init(pred_ca_extended, 'y')
+  #   
+  #   # CONUS
+  #   # Main blending block for 49th parallel
+  #   ext.blend1 <- c(-50, -50, 48, 47.5)
+  #   weights1 <- weightSurface(lat, lon, ext.blend1)
+  #   
+  #   # Main blending block for vancouver island
+  #   # ext.blend2 <- c(-122.95, -122.7625, 48.15, 48)
+  #   # weights2 <- weightSurface(lat, lon, ext.blend2)
+  #   
+  #   #combined weights
+  #   # weights <- weights1 + weights2
+  #   weights <- weights1
+  #   weights[weights>1] <- 1
+  #   weights[weights<0] <- 0
+  #   
+  #   pred_us_proj <- project(crop_us_ext, pred_ca_extended)
+  #   
+  #   composite <- mosaic(pred_ca_extended*weights, pred_us_proj*(1-weights), fun="sum")
+  #   
+  #   writeRaster(composite, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/", months[i], "/spec1/gen", gens[j], "/", months[i], "_merged_masked.tif"), overwrite=T)
+  #   
+  # }
+      # read in both rasters and calculate extents
+    pred_ca <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmax/Model4/", months[i], "/", months[i], "_fullregion_masked.nc"))
+    pred_us <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmax/Model4/", months[i], "/", months[i], "_US_masked.nc"))
+    
+    ext_ca <- ext(pred_ca)
+    ext_us <- ext(pred_us)
+    crop_ca <- crop(pred_ca, ext(ext_ca$xmin, ext_ca$xmax, ext_ca$ymin, ext_ca$ymax))
+    crop_us <- crop(pred_us, ext(-148, ext_ca$xmax, ext_us$ymin, 48))
+    
+    crop_us_ext <- extend.coastal(crop_us)
+    
+    # extend preferred raster to full area
+    full_ext <- ext(ext_ca$xmin, ext_ca$xmax, ext_us$ymin, ext_ca$ymax)
+    pred_ca_extended <- extend(crop_ca, full_ext)
+    
+    # lat and lon rasters
+    lon <- init(pred_ca_extended, 'x')
+    lat <- init(pred_ca_extended, 'y')
+    
+    # CONUS
+    # Main blending block for 49th parallel
+    ext.blend1 <- c(-50, -50, 48, 47.5)
+    weights1 <- weightSurface(lat, lon, ext.blend1)
+    
+    # Main blending block for vancouver island
+    ext.blend2 <- c(-122.95, -122.7625, 48.15, 48)
+    weights2 <- weightSurface(lat, lon, ext.blend2)
+    
+    #combined weights
+    weights <- weights1 + weights2
+    weights <- weights1
+    weights[weights>1] <- 1
+    weights[weights<0] <- 0
+    
+    pred_us_proj <- project(crop_us_ext, pred_ca_extended)
+    
+    composite <- mosaic(pred_ca_extended*weights, pred_us_proj*(1-weights), fun="sum")
+    
+    writeRaster(composite, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmax/Model4/", months[i], "/", months[i], "_merged_masked.tif"), overwrite=T)
+}
 ```
 
 ### Tile station data:
