@@ -12,18 +12,18 @@ months <- tolower(month.abb)
 gans <- list()
 
 for (i in seq_along(months)) {
-  res <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/", months[i], "/spec1/gen50/", months[i], "_merged_masked.tif"))
+  res <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmin/Model4/", months[i], "/", months[i], "_merged_masked.tif"))
   gans[[i]] <- res
 }
 
 par(mfrow = c(3, 4))
 
 for (i in seq_along(months)) {
-  plot(gans[[i]], main = paste(months[i], "GAN50"))
+  plot(gans[[i]], main = paste(months[i], "FM4"))
 }
 
 ## read in and prep station data
-var <- "ppt"
+var <- "tmin"
 stns_data <- list()
 dem <- rast(paste("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/dem/test area prep/dem_stn_train.tif"))
 
@@ -32,7 +32,7 @@ par(mfrow = c(3, 4))
 for (i in seq_along(months)) {
   # load the source STATION data for the BC prism
   dir <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/"
-  stn.info <- fread(paste(dir, var,"/pr_uscdn_8110.csv", sep="")) #read in
+  stn.info <- fread(paste(dir, var,"/tmin_uscdn_8110.csv", sep="")) #read in
   for (j in which(names(stn.info)%in%c(month.abb, "Annual"))) stn.info[get(names(stn.info)[j])==c(-9999), (j):=NA, ] # replace -9999 with NA
   stn.info <- stn.info[-which(Elevation==-9999),]
   stn.info <- stn.info[-which(El_Flag=="@"),]
@@ -106,7 +106,7 @@ for (i in seq_along(months)) {
   stn.info.train <- rbind(stn.info.train, ps_df)
   
   # make all stations in training area = 0
-  prism <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/prec/", months[i], "/prism_train_coarse.nc"))
+  prism <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmin/", months[i], "/prism_train_coarse.nc"))
   all_stns <- vect(as.data.frame(stn.info.train), geom = c("Long", "Lat"), crs = crs(res))
   training <- extract(prism, all_stns)
   inside_training <- !is.na(training[,2])
@@ -142,9 +142,9 @@ for (i in seq_along(months)) {
   corrected <- res + bias_raster
   
   # save spline surface and debiased map
-  writeCDF(bias_raster, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/", months[i], "/spec1/gen50/spline.nc"), varname='prec', overwrite = T)
+  writeCDF(bias_raster, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmin/Model4/", months[i], "/spline.nc"), varname='tmax', overwrite = T)
   
-  writeCDF(corrected, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/", months[i], "/spec1/gen50/", months[i], "_debias.nc"), varname='prec', overwrite = T)
+  writeCDF(corrected, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmin/Model4/", months[i], "/", months[i], "_debias.nc"), varname='tmax', overwrite = T)
 }
 
 ## plot surfaces
