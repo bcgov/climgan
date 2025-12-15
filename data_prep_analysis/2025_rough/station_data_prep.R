@@ -16,7 +16,7 @@ stn.info <- stn.info[-which(El_Flag=="@"),]
 stn.info <- stn.info[complete.cases(stn.info[, ..month.abb])]
 
 ## ---- CANADA ----
-stn.info.train <- stn.info[Lat>47.57 & Lat<72.04 & Long > -150.16 & Long < -104.87] # training area
+stn.info.train <- stn.info[Lat>47.5 & Lat<72.04 & Long > -150.16 & Long < -104.87] # training area
 
 # standardize
 stand_dir <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/prec"

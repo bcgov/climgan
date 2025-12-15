@@ -1,38 +1,75 @@
 library(fields)
 library(terra)
 library(data.table)
-library(reticulate)
 library(RColorBrewer)
 library(raster)
 library(sf)
 library(leaflet)
+
+## find quantiles for incorrect elevation threshold across all stations
+dem <- rast(paste("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/dem/dem_debias.tif"))
+dir <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/"
+
+# prec
+stn.info.prec <- fread(paste(dir, "ppt/pr_uscdn_8110.csv", sep="")) #read in
+for (j in which(names(stn.info.prec)%in%c(month.abb, "Annual"))) stn.info.prec[get(names(stn.info.prec)[j])==c(-9999), (j):=NA, ] # replace -9999 with NA
+stn.info.prec <- stn.info.prec[-which(Elevation==-9999),]
+stn.info.prec <- stn.info.prec[-which(El_Flag=="@"),]
+
+# tmax
+stn.info.tmax <- fread(paste(dir, "tmax/tmax_uscdn_8110.csv", sep="")) #read in
+for (j in which(names(stn.info.tmax)%in%c(month.abb, "Annual"))) stn.info.tmax[get(names(stn.info.tmax)[j])==c(-9999), (j):=NA, ] # replace -9999 with NA
+stn.info.tmax <- stn.info.tmax[-which(Elevation==-9999),]
+stn.info.tmax <- stn.info.tmax[-which(El_Flag=="@"),]
+stn.info.tmax[, (month.abb) := lapply(.SD, function(x) x/10), .SDcols = month.abb] # divide by 10
+
+# tmin
+stn.info.tmin <- fread(paste(dir, "tmin/tmin_uscdn_8110.csv", sep="")) #read in
+for (j in which(names(stn.info.tmin)%in%c(month.abb, "Annual"))) stn.info.tmin[get(names(stn.info.tmin)[j])==c(-9999), (j):=NA, ] # replace -9999 with NA
+stn.info.tmin <- stn.info.tmin[-which(Elevation==-9999),]
+stn.info.tmin <- stn.info.tmin[-which(El_Flag=="@"),]
+stn.info.tmin[, (month.abb) := lapply(.SD, function(x) x/10), .SDcols = month.abb] # divide by 10
+
+all <- rbindlist(list(stn.info.prec, stn.info.tmax, stn.info.tmin))
+all_train <- all[Lat>ext(dem)[3] & Lat<ext(dem)[4] & Long > ext(dem)[1] & Long < ext(dem)[2]]
+
+# find elev error in all stations
+stns <- vect(as.data.frame(all_train), geom = c("Long", "Lat"), crs = crs(dem))
+all_train$dem_elev <- terra::extract(dem, stns)[,2]
+all_train$elev_diff <- (all_train$Elevation - all_train$dem_elev)
+
+# calculate threshold
+mu  <- mean(all_train$elev_diff, na.rm = TRUE)
+std_dev <- sd(all_train$elev_diff,  na.rm = TRUE)
+lower <- mu - 3*std_dev
+upper <- mu + 3*std_dev
 
 ## read in GAN prediction
 months <- tolower(month.abb)
 gans <- list()
 
 for (i in seq_along(months)) {
-  res <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmin/Model4/", months[i], "/", months[i], "_merged_masked.tif"))
+  res <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/", months[i], "/spec1/gen50/", months[i], "_merged_masked.tif"))
   gans[[i]] <- res
 }
 
 par(mfrow = c(3, 4))
 
 for (i in seq_along(months)) {
-  plot(gans[[i]], main = paste(months[i], "FM4"))
+  plot(gans[[i]], main = paste(months[i], "GAN50"))
 }
 
 ## read in and prep station data
-var <- "tmin"
+var <- "ppt"
 stns_data <- list()
-dem <- rast(paste("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/dem/test area prep/dem_stn_train.tif"))
+dem <- rast(paste("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/dem/dem_debias.tif"))
 
 par(mfrow = c(3, 4))
 
 for (i in seq_along(months)) {
   # load the source STATION data for the BC prism
   dir <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/"
-  stn.info <- fread(paste(dir, var,"/tmin_uscdn_8110.csv", sep="")) #read in
+  stn.info <- fread(paste(dir, var,"/pr_uscdn_8110.csv", sep="")) #read in
   for (j in which(names(stn.info)%in%c(month.abb, "Annual"))) stn.info[get(names(stn.info)[j])==c(-9999), (j):=NA, ] # replace -9999 with NA
   stn.info <- stn.info[-which(Elevation==-9999),]
   stn.info <- stn.info[-which(El_Flag=="@"),]
@@ -47,15 +84,8 @@ for (i in seq_along(months)) {
   
   # remove any stations that have incorrect elevations outside threshold
   stns <- vect(as.data.frame(stn.info.train), geom = c("Long", "Lat"), crs = crs(dem))
-  
   stn.info.train$dem_elev <- terra::extract(dem, stns)[,2]
   stn.info.train$elev_diff <- (stn.info.train$Elevation - stn.info.train$dem_elev)
-  
-  # remove any stations that are outside of 3 standard deviations from the centre of the dist
-  mu  <- mean(stn.info.train$elev_diff, na.rm = TRUE)
-  std_dev <- sd(stn.info.train$elev_diff,  na.rm = TRUE)
-  lower <- mu - 3*std_dev
-  upper <- mu + 3*std_dev
   stn.info.train <- stn.info.train[elev_diff >= lower & elev_diff <= upper]
   
   # extract GAN generated map values at station locations and calculate bias
@@ -106,7 +136,7 @@ for (i in seq_along(months)) {
   stn.info.train <- rbind(stn.info.train, ps_df)
   
   # make all stations in training area = 0
-  prism <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmin/", months[i], "/prism_train_coarse.nc"))
+  prism <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/prec/", months[i], "/prism_train_coarse.nc"))
   all_stns <- vect(as.data.frame(stn.info.train), geom = c("Long", "Lat"), crs = crs(res))
   training <- extract(prism, all_stns)
   inside_training <- !is.na(training[,2])
@@ -142,9 +172,9 @@ for (i in seq_along(months)) {
   corrected <- res + bias_raster
   
   # save spline surface and debiased map
-  writeCDF(bias_raster, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmin/Model4/", months[i], "/spline.nc"), varname='tmax', overwrite = T)
+  writeCDF(bias_raster, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/", months[i], "/spec1/gen50/spline1.nc"), varname='prec', overwrite = T)
   
-  writeCDF(corrected, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmin/Model4/", months[i], "/", months[i], "_debias.nc"), varname='tmax', overwrite = T)
+  writeCDF(corrected, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/", months[i], "/spec1/gen50/", months[i], "_debias1.nc"), varname='prec', overwrite = T)
 }
 
 ## plot surfaces

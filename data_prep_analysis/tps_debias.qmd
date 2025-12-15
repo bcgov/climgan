@@ -1,5 +1,5 @@
 ---
-title: "tps_debias"
+title: "2025 GAN Runs: TPS Debias"
 format: html
 ---
 
@@ -7,17 +7,78 @@ format: html
 library(fields)
 library(terra)
 library(data.table)
-library(reticulate)
 library(RColorBrewer)
 library(raster)
 library(sf)
 library(leaflet)
+library(dplyr)
 ```
 
-```{python}
-import torch
-import numpy as np
-from matplotlib import pyplot as plt
+### Calculate allowable threshold for incorrect station elevation:
+
+```{r}
+dem <- rast(paste("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/dem/dem_debias.tif"))
+dir <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/"
+
+# prec
+stn.info.prec <- fread(paste(dir, "ppt/pr_uscdn_8110.csv", sep="")) #read in
+for (j in which(names(stn.info.prec)%in%c(month.abb, "Annual"))) stn.info.prec[get(names(stn.info.prec)[j])==c(-9999), (j):=NA, ] # replace -9999 with NA
+stn.info.prec <- stn.info.prec[-which(Elevation==-9999),]
+stn.info.prec <- stn.info.prec[-which(El_Flag=="@"),]
+
+# tmax
+stn.info.tmax <- fread(paste(dir, "tmax/tmax_uscdn_8110.csv", sep="")) #read in
+for (j in which(names(stn.info.tmax)%in%c(month.abb, "Annual"))) stn.info.tmax[get(names(stn.info.tmax)[j])==c(-9999), (j):=NA, ] # replace -9999 with NA
+stn.info.tmax <- stn.info.tmax[-which(Elevation==-9999),]
+stn.info.tmax <- stn.info.tmax[-which(El_Flag=="@"),]
+
+# tmin
+stn.info.tmin <- fread(paste(dir, "tmin/tmin_uscdn_8110.csv", sep="")) #read in
+for (j in which(names(stn.info.tmin)%in%c(month.abb, "Annual"))) stn.info.tmin[get(names(stn.info.tmin)[j])==c(-9999), (j):=NA, ] # replace -9999 with NA
+stn.info.tmin <- stn.info.tmin[-which(Elevation==-9999),]
+stn.info.tmin <- stn.info.tmin[-which(El_Flag=="@"),]
+
+all <- rbindlist(list(stn.info.prec, stn.info.tmax, stn.info.tmin))
+all_train <- all[Lat>ext(dem)[3] & Lat<ext(dem)[4] & Long > ext(dem)[1] & Long < ext(dem)[2]]
+
+# find elev error in all stations
+stns <- vect(as.data.frame(all_train), geom = c("Long", "Lat"), crs = crs(dem))
+all_train$dem_elev <- terra::extract(dem, stns)[,2]
+all_train$elev_diff <- (all_train$Elevation - all_train$dem_elev)
+
+# calculate threshold
+mu  <- mean(all_train$elev_diff, na.rm = TRUE)
+std_dev <- sd(all_train$elev_diff,  na.rm = TRUE)
+lower <- mu - 3*std_dev
+upper <- mu + 3*std_dev
+```
+
+### Set aside subset of US stations for testing (DONE):
+
+```{r}
+# files now exist for this, do not need to rerun
+# use 10% of stations in US for running the debias spline, remaining 90% for evaluating how well the debiasing is working
+set.seed(42)
+stn.info.prec.us <- stn.info.prec[Lat<47.5 & Lat>42.0625 & Long > -150 & Long < -104.9167]
+ppt.test.stations <- stn.info.prec.us %>% slice_sample(n = ceiling(0.10 * nrow(stn.info.prec.us)))
+ppt.eval.stations <- stn.info.prec.us %>% anti_join(ppt.test.stations)
+
+write.csv(ppt.test.stations, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/ppt/", "ppt_test_stations.csv"), row.names = FALSE)
+write.csv(ppt.eval.stations, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/ppt/", "ppt_eval_stations.csv"), row.names = FALSE)
+
+stn.info.tmax.us <- stn.info.tmax[Lat<47.5 & Lat>42.0625 & Long > -150 & Long < -104.9167]
+tmax.test.stations <- stn.info.tmax.us %>% slice_sample(n = ceiling(0.10 * nrow(stn.info.tmax.us)))
+tmax.eval.stations <- stn.info.tmax.us %>% anti_join(tmax.test.stations)
+
+write.csv(tmax.test.stations, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/tmax/", "tmax_test_stations.csv"), row.names = FALSE)
+write.csv(tmax.eval.stations, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/tmax/", "tmax_eval_stations.csv"), row.names = FALSE)
+
+stn.info.tmin.us <- stn.info.tmin[Lat<47.5 & Lat>42.0625 & Long > -150 & Long < -104.9167]
+tmin.test.stations <- stn.info.tmin.us %>% slice_sample(n = ceiling(0.10 * nrow(stn.info.tmin.us)))
+tmin.eval.stations <- stn.info.tmin.us %>% anti_join(tmin.test.stations)
+
+write.csv(tmax.test.stations, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/tmin/", "tmin_test_stations.csv"), row.names = FALSE)
+write.csv(tmax.eval.stations, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/tmin/", "tmin_eval_stations.csv"), row.names = FALSE)
 ```
 
 ### Read in GAN prediction:
@@ -27,78 +88,59 @@ months <- tolower(month.abb)
 gans <- list()
 
 for (i in seq_along(months)) {
-  res <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/", months[i], "/spec1/gen50/", months[i], "_merged_masked.tif"))
-  plot(res)
+  res <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmin/Model4/", months[i], "/", months[i], "_merged_masked.tif"))
+  plot(res, main = paste(months[i], "FM4"))
   gans[[i]] <- res
 }
 ```
 
-### Read in station data:
+### Read in and prep station data:
 
 ```{r}
-var <- "ppt"
+var <- "tmin"
 stns_data <- list()
+dem <- rast(paste("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/dem/dem_debias.tif"))
 
 for (i in seq_along(months)) {
   # load the source STATION data for the BC prism
   dir <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/"
-  stn.info <- fread(paste(dir, var,"/pr_uscdn_8110.csv", sep="")) #read in
-  for (i in which(names(stn.info)%in%c(month.abb, "Annual"))) stn.info[get(names(stn.info)[i])==c(-9999), (i):=NA, ] # replace -9999 with NA
+  stn.info <- fread(paste(dir, var,"/tmin_uscdn_8110.csv", sep="")) #read in
+  for (j in which(names(stn.info)%in%c(month.abb, "Annual"))) stn.info[get(names(stn.info)[j])==c(-9999), (j):=NA, ] # replace -9999 with NA
   stn.info <- stn.info[-which(Elevation==-9999),]
   stn.info <- stn.info[-which(El_Flag=="@"),]
-  stn.info <- stn.info[complete.cases(stn.info[, ..month.abb])]
   
-  res <- gans[[i]]
-  stn.info.train <- stn.info[Lat>ext(res)[3] & Lat<ext(res)[4] & Long > ext(res)[1] & Long < ext(res)[2]]
+  stn.info.ca <- stn.info[Lat<72 & Lat>47.5 & Long > -150 & Long < -104.9167]
+  
+  stn.info.us <- fread(paste(dir, var,"/tmin_test_stations.csv", sep="")) #read in
+  for (j in which(names(stn.info.us)%in%c(month.abb, "Annual"))) stn.info.us[get(names(stn.info.us)[j])==c(-9999), (j):=NA, ] # replace -9999 with NA
+  
+  stn.info.train <- rbindlist(list(stn.info.ca, stn.info.us))
   
   if (var != "ppt") {
     stn.info.train[, (month.abb) := lapply(.SD, function(x) x/10), .SDcols = month.abb] # divide by 10
   }
-  stns_data[[i]] <- stn.info.train
-}
-```
-
-### Remove any stations that have incorrect elevations:
-
-```{r}
-dem <- rast(paste("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/dem/test area prep/dem_stn_train.tif"))
-
-for (i in seq_along(months)) {
-  stn.info.train <- stns_data[[i]]
-  stns <- vect(as.data.frame(stn.info.train), geom = c("Long", "Lat"), crs = crs(dem))
   
+  # keep current month
+  month <- stringr::str_to_title(months[i])
+  keep_cols <- c("St_ID", "St_Flag", "Name", "Elevation", "El_Flag",
+               "Long", "Lat", month)
+  stn.info.train <- stn.info.train[, ..keep_cols]
+  stn.info.train <- stn.info.train[!is.na(get(month))] # remove any stations with NA observations
+  
+  # remove any stations that have incorrect elevations outside threshold
+  stns <- vect(as.data.frame(stn.info.train), geom = c("Long", "Lat"), crs = crs(dem))
   stn.info.train$dem_elev <- terra::extract(dem, stns)[,2]
   stn.info.train$elev_diff <- (stn.info.train$Elevation - stn.info.train$dem_elev)
-  
-  # remove any stations that are outside of 3 standard deviations from the centre of the dist
-  mu  <- mean(stn.info.train$elev_diff, na.rm = TRUE)
-  std_dev <- sd(stn.info.train$elev_diff,  na.rm = TRUE)
-  lower <- mu - 3*std_dev
-  upper <- mu + 3*std_dev
   stn.info.train <- stn.info.train[elev_diff >= lower & elev_diff <= upper]
-  stns_data[[i]] <- stn.info.train
-}
-```
-
-### Extract raster values at station locations and compute bias:
-
-```{r}
-for (i in seq_along(months)) {
+  
+  # extract GAN generated map values at station locations and calculate bias
   res <- gans[[i]]
-  stn.info.train <- stns_data[[i]]
   pts <- vect(as.data.frame(stn.info.train), geom = c("Long", "Lat"), crs = crs(res))
   stn.info.train$raster_vals <- terra::extract(res, pts)[,2]
-  stn.info.train$bias <- stn.info.train$Jun - stn.info.train$raster_vals
-  stns_data[[i]] <- stn.info.train
-}
-```
-
-### Add pseudostations:
-
-```{r}
-for (i in seq_along(months)) {
+  stn.info.train$bias <- stn.info.train[[month]] - stn.info.train$raster_vals
+  
+  ## add pseudostations
   # create box that has the same extent as the GAN generated map, change CRS to Albers Equal Area, and make the box into a grid with cells that are 100km wide (the centers of these cells will be the pseudostations), change parameters grid_width & buffer
-  res <- gans[[i]]
   grid_width <- 100000 # 100km in m
   buffer <- 50000 # 50km in m
   bbox <- as.polygons(ext(res), crs=crs(res))
@@ -127,149 +169,160 @@ for (i in seq_along(months)) {
     El_Flag = NA,
     Long = crds(ps)[,1],
     Lat = crds(ps)[,2],
-    Jan = 0, Feb = 0, Mar = 0, Apr = 0, May = 0, Jun = 0,
-    Jul = 0, Aug = 0, Sep = 0, Oct = 0, Nov = 0, Dec = 0,
-    Annual = 0,
     dem_elev = 0,
     elev_diff = 0,
     raster_vals = 0,
     bias = 0
   )
+  ps_df[[month]] <- 0
   
   stn.info.train <- rbind(stn.info.train, ps_df)
+  ps_df <- ps_df[, colnames(stn.info.train), drop = FALSE] # match column order
   
   # make all stations in training area = 0
-  prism <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/prec/jun/prism_train_coarse.nc"))
+  prism <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/", months[i], "/prism_train_coarse.nc"))
   all_stns <- vect(as.data.frame(stn.info.train), geom = c("Long", "Lat"), crs = crs(res))
   training <- extract(prism, all_stns)
   inside_training <- !is.na(training[,2])
   stn.info.train$bias[inside_training] <- 0
   
   # sanity check
-  plot(is.na(res))
+  plot(is.na(res),  main = paste(months[i], "Stations"))
   all <- vect(as.data.frame(stn.info.train), geom = c("Long", "Lat"), crs = crs(res))
   zero_bias_pts <- all[all$bias == 0, ]
   nonzero_bias_pts <- all[all$bias != 0, ]
   plot(zero_bias_pts, col="red", pch=20, cex = 0.7, add=TRUE)
   plot(nonzero_bias_pts, col="green", pch=20, cex = 0.7, add=TRUE)
   
+  stns_data[[i]] <- stn.info.train
 }
 ```
 
-### Fit Thin Plate Spline model:
+### Fit Thin Plate Spline model and predict:
 
 ```{r}
-coords <- as.matrix(stn.info.train[, c("Long", "Lat")])
-bias   <- stn.info.train$bias
+for (i in seq_along(months)) {
+  res <- gans[[i]]
+  stn.info.train <- stns_data[[i]]
+  
+  coords <- as.matrix(stn.info.train[, c("Long", "Lat")])
+  bias   <- stn.info.train$bias
+  
+  tps_model <- Tps(coords, bias, lambda = NULL)
+  
+  grid_coords <- crds(res, df = TRUE, na.rm=FALSE)
+  pred_bias <- predict(tps_model, grid_coords)
+  
+  bias_raster <- rast(res)
+  values(bias_raster) <- pred_bias
+  
+  corrected <- res + bias_raster
+  
+  # save spline surface and debiased map
+  writeCDF(bias_raster, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmin/Model4/", months[i], "/spline.nc"), varname='tmin', overwrite = T)
 
-tps_model <- Tps(coords, bias, lambda = NULL)
+  writeCDF(corrected, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmin/Model4/", months[i], "/", months[i], "_debias.nc"), varname='tmin', overwrite = T)
+}
 ```
 
-### Predict:
+### Plot surfaces & spline:
 
 ```{r}
-grid_coords <- crds(res, df = TRUE, na.rm=FALSE)
-pred_bias <- predict(tps_model, grid_coords)
+bias <- list()
+for (i in seq_along(months)) {
+ bias_raster <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmin/Model4/", months[i], "/spline.nc")) 
+ bias[[i]] <- bias_raster
+}
 
-bias_raster <- rast(res)
-values(bias_raster) <- pred_bias
+prism_list <- list()
+fm_list <- list()
+spec_list <- list()
+debias_list <- list()
 
-corrected <- res + bias_raster
+for (i in seq_along(months)) {
+  prism <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmin/", months[i], "/prism_train_coarse.nc"))
+  # prism.log <- log1p(prism)
+  fm <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmin/Model4/", months[i], "/" , months[i], "_merged_masked.tif"))
+  # fm.log <- log1p(fm)
+  # spec <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/", months[i], "/spec1/gen50/" , months[i], "_merged_masked.tif"))
+  # spec.log <- log1p(spec)
+  debias <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmin/Model4/", months[i], "/", months[i], "_debias.nc"))
+  # debias.log <- log1p(debias)
+  
+  prism <- project(prism, debias)
+  fm <- project(fm, debias)
+  # spec.log <- project(spec.log, debias.log)
+  
+  prism_list[[i]] <- prism
+  fm_list[[i]] <- fm
+  # spec_list[[i]] <- spec.log
+  debias_list[[i]] <- debias
+}
 
-# save spline surface and debiased map
-writeCDF(bias_raster, paste("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/jun/spec1/gen50/spline.nc"), varname='prec', overwrite = T)
-
-writeCDF(corrected, paste("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/jun/spec1/gen50/jun_debias.nc"), varname='prec', overwrite = T)
-```
-
-### Plot surfaces:
-
-```{r}
-stn.data <- stn.info.train[,get("Jun")]
+stn.info.train <- stns_data[[12]]
+# stn.info.train[, (month.abb) := lapply(.SD, function(x) log1p(x)), .SDcols = month.abb]
+stn.info.train <- stn.info.train[stn.info.train$bias != 0, ]
+stn.data <- stn.info.train[,get("Dec")]
 stn.data <- stn.data[is.finite(stn.data)]
 
+stn.data.bias <- stn.info.train[,get("bias")]
+stn.data.bias <- stn.data.bias[is.finite(stn.data.bias)]
 
-all_values <- c(values(res),
-                values(bias_raster),
-                values(corrected)
+vals <- c(values(bias[[12]])
 )
 
-all_values <- all_values[is.finite(all_values)]
-inc=diff(range(all_values))/500
-breaks=seq(quantile(all_values, 0.00025)-inc, quantile(all_values, 0.99975)+inc, inc)
-ColScheme <- colorRampPalette(brewer.pal(9, "YlGnBu"))(length(breaks)-1)
-ColPal <- colorBin(ColScheme, bins=breaks, na.color = "white")
-ColPal.raster <- colorBin(ColScheme, bins=breaks, na.color = "transparent")
+vals <- vals[is.finite(vals)]
 
 # Make the domain symmetric around 0
-max_val <- max(abs(values(bias_raster)))
+max_val <- max(abs(vals), abs(stn.data.bias))
 domain <- c(-max_val, max_val)
-ColScheme.bias <- colorRampPalette(c("blue", "white", "red"))(500)
+ColScheme.bias <- colorRampPalette(c("blue", "white", "red"))(1000)
 ColPal.bias <- colorNumeric(
   palette = ColScheme.bias,
   domain  = domain,
   na.color = "transparent"
 )
-
-
-# leaflet map
-labels <- paste(stn.info.train$Name, "(El. ", stn.info.train$Elevation, "m)", sep="")
-map <- leaflet(stn.info.train) %>%
-  addTiles(group = "basemap") %>%
-  addProviderTiles('Esri.WorldImagery', group = "sat photo") %>%
-  addRasterImage(res, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "GAN") %>%
-  addRasterImage(bias_raster, colors = ColPal.bias, opacity = 1, maxBytes = 12890669, group = "bias") %>%
-  addRasterImage(corrected, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "debiased GAN") %>%
-  addCircleMarkers(lng = ~Long, lat = ~Lat, color="black", fillColor = ~ ColPal(stn.data), opacity = 1, fillOpacity = 1, popup = labels, radius=6, weight=2, group = "Stations") %>%
-  addLayersControl(
-    overlayGroups = c("GAN",
-                      "bias",
-                      "debiased GAN",
-                      "Stations"
-    ),
-    options = layersControlOptions(collapsed = FALSE)
-  )
-map
-```
-
-### Plot spline:
-
-```{r}
-stn.info.train <- stn.info.train[stn.info.train$bias != 0, ]
-stn.data <- stn.info.train[,get("bias")]
-stn.data <- stn.data[is.finite(stn.data)]
-
-all_values <- c(values(bias_raster)
-)
-
-all_values <- all_values[is.finite(all_values)]
-
-# Make the domain symmetric around 0
-max_val <- max(abs(all_values))
-domain <- c(-max_val, max_val)
-ColScheme <- colorRampPalette(c("blue", "white", "red"))(500)
-ColPal.raster <- colorNumeric(
-  palette = ColScheme,
-  domain  = domain,
-  na.color = "transparent"
-)
 ColPal.points <- colorNumeric(
-  palette = ColScheme,
+  palette = ColScheme.bias,
   domain  = domain,
   na.color = "white"
 )
 
+all_values <- c(values(prism_list[[12]]),
+                values(fm_list[[12]]),
+                # values(spec_list[[1]]),
+                values(debias_list[[12]])
+)
+
+all_values <- all_values[is.finite(all_values)]
+inc=diff(range(all_values))/500
+breaks=seq(quantile(all_values, 0.00025)-inc, quantile(all_values, 0.99975)+inc, inc)
+# brewer.pal(9, "YlGnBu")
+ColScheme <- colorRampPalette(rev(brewer.pal(11, "RdYlBu")))(length(breaks)-1)
+ColPal <- colorBin(ColScheme, bins=breaks, na.color = "white")
+ColPal.raster <- colorBin(ColScheme, bins=breaks, na.color = "transparent")
+
 
 # leaflet map
 labels <- paste(stn.info.train$Name, "(El. ", stn.info.train$Elevation, "m)", sep="")
 map <- leaflet(stn.info.train) %>%
   addTiles(group = "basemap") %>%
   addProviderTiles('Esri.WorldImagery', group = "sat photo") %>%
-  addRasterImage(bias_raster, colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "bias") %>%
-  addCircleMarkers(lng = ~Long, lat = ~Lat, color="black", fillColor = ~ ColPal.points(stn.data), opacity = 1, fillOpacity = 1, popup = labels, radius=6, weight=2, group = "Stations") %>%
+  addRasterImage(prism_list[[12]], colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "Dec PRISM") %>%
+  addRasterImage(fm_list[[12]], colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "Dec FM4") %>%
+  # addRasterImage(spec_list[[1]], colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "Dec GAN50") %>%
+  addRasterImage(debias_list[[12]], colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "Dec FM4 debias") %>%
+  addCircleMarkers(lng = ~Long, lat = ~Lat, color="black", fillColor = ~ ColPal(stn.data), opacity = 1, fillOpacity = 1, popup = labels, radius=6, weight=2, group = "Stations") %>%
+    addRasterImage(bias[[12]], colors = ColPal.bias, opacity = 1, maxBytes = 12890669, group = "spline") %>%
+  addCircleMarkers(lng = ~Long, lat = ~Lat, color="black", fillColor = ~ ColPal.points(stn.data.bias), opacity = 1, fillOpacity = 1, popup = labels, radius=6, weight=2, group = "Stations error") %>%
   addLayersControl(
-    overlayGroups = c("bias",
-                      "Stations"
+    overlayGroups = c("Dec PRISM",
+                      "Dec FM4",
+                      # "Jan GAN50",
+                      "Dec FM4 debias",
+                      "Stations",
+                      "spline",
+                      "Stations error"
     ),
     options = layersControlOptions(collapsed = FALSE)
   )
