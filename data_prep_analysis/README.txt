@@ -10,6 +10,6 @@ TRAINING:
 
 3. Open "output_data_prep.qmd" and run this to create rasters from GAN outputs (.pt files). You will need to change the variable names throughout the files and make sure the filepaths are correct.
 
-4. Open "tps_debias.qmd" and run this to debias the GAN output according to weather stations. You will need to change the variable names throughout the files and make sure the filepaths are correct.
+4. Open "tps_debias.qmd" and run this to debias the GAN output according to weather stations. You will need to change the variable names throughout the files and make sure the filepaths are correct. There is also code in here for plotting the debiased predictions against the GAN outputs.
 
-5. which file is for leaflet maps?
+5. (Optional) Code for plotting predictions in leaflet maps is in "plot_pred.R".

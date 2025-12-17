@@ -77,8 +77,8 @@ stn.info.tmin.us <- stn.info.tmin[Lat<47.5 & Lat>42.0625 & Long > -150 & Long < 
 tmin.test.stations <- stn.info.tmin.us %>% slice_sample(n = ceiling(0.10 * nrow(stn.info.tmin.us)))
 tmin.eval.stations <- stn.info.tmin.us %>% anti_join(tmin.test.stations)
 
-write.csv(tmax.test.stations, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/tmin/", "tmin_test_stations.csv"), row.names = FALSE)
-write.csv(tmax.eval.stations, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/tmin/", "tmin_eval_stations.csv"), row.names = FALSE)
+write.csv(tmin.test.stations, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/tmin/", "tmin_test_stations.csv"), row.names = FALSE)
+write.csv(tmin.eval.stations, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/tmin/", "tmin_eval_stations.csv"), row.names = FALSE)
 ```
 
 ### Read in GAN prediction:
@@ -109,6 +109,7 @@ for (i in seq_along(months)) {
   stn.info <- stn.info[-which(Elevation==-9999),]
   stn.info <- stn.info[-which(El_Flag=="@"),]
   
+  stn.info.all <- stn.info[Lat<72 & Lat>42.0625 & Long > -150 & Long < -104.9167]
   stn.info.ca <- stn.info[Lat<72 & Lat>47.5 & Long > -150 & Long < -104.9167]
   
   stn.info.us <- fread(paste(dir, var,"/tmin_test_stations.csv", sep="")) #read in
@@ -148,9 +149,10 @@ for (i in seq_along(months)) {
   bbox_aea_sf <- st_transform(bbox_sf, "ESRI:102008")
   grid <- st_make_grid(bbox_aea_sf, cellsize = grid_width, what = "centers")
   
-  # project the real stations onto the same grid as pseudostations and remove any pseudostations that are within 100km from a real station, then project the pseudostations back onto lat/lon crs
+  # project the real stations onto the same grid as pseudostations and remove any pseudostations that are within 50km from a real station, then project the pseudostations back onto lat/lon crs
+  pts_all <- vect(as.data.frame(stn.info.all), geom = c("Long", "Lat"), crs = crs(res))
   grid_vect <- vect(grid)
-  pts_aea <- project(pts, grid_vect)
+  pts_aea <- project(pts_all, grid_vect)
   d <- distance(grid_vect, pts_aea)
   keep_idx <- apply(d, 1, function(x) all(x > buffer))
   grid_vect_keep <- grid_vect[keep_idx, ]
@@ -180,7 +182,7 @@ for (i in seq_along(months)) {
   ps_df <- ps_df[, colnames(stn.info.train), drop = FALSE] # match column order
   
   # make all stations in training area = 0
-  prism <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmax/", months[i], "/prism_train_coarse.nc"))
+  prism <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmin/", months[i], "/prism_train_coarse.nc"))
   all_stns <- vect(as.data.frame(stn.info.train), geom = c("Long", "Lat"), crs = crs(res))
   training <- extract(prism, all_stns)
   inside_training <- !is.na(training[,2])
@@ -259,11 +261,20 @@ for (i in seq_along(months)) {
   debias_list[[i]] <- debias
 }
 
+dir <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/"
+var <- "tmin"
+stn.info.test <- fread(paste(dir, var,"/tmin_eval_stations.csv", sep="")) #read in
+for (j in which(names(stn.info.test)%in%c(month.abb, "Annual"))) stn.info.test[get(names(stn.info.test)[j])==c(-9999), (j):=NA, ] # replace -9999 with NA
+stn.info.test[, (month.abb) := lapply(.SD, function(x) x/10), .SDcols = month.abb] # divide by 10
+# stn.info.test[, (month.abb) := lapply(.SD, function(x) log1p(x)), .SDcols = "Jan"]
+stn.data.test <- stn.info.test[,get("Dec")]
+stn.data.test <- stn.data.test[is.finite(stn.data.test)]
+
 stn.info.train <- stns_data[[12]]
-# stn.info.train[, (month.abb) := lapply(.SD, function(x) log1p(x)), .SDcols = month.abb]
+# stn.info.train[, (month.abb) := lapply(.SD, function(x) log1p(x)), .SDcols = "Jan"]
 stn.info.train <- stn.info.train[stn.info.train$bias != 0, ]
-stn.data <- stn.info.train[,get("Dec")]
-stn.data <- stn.data[is.finite(stn.data)]
+stn.data.train <- stn.info.train[,get("Dec")]
+stn.data.train <- stn.data.train[is.finite(stn.data.train)]
 
 stn.data.bias <- stn.info.train[,get("bias")]
 stn.data.bias <- stn.data.bias[is.finite(stn.data.bias)]
@@ -291,36 +302,40 @@ ColPal.points <- colorNumeric(
 all_values <- c(values(prism_list[[12]]),
                 values(fm_list[[12]]),
                 # values(spec_list[[1]]),
-                values(debias_list[[12]])
+                values(debias_list[[12]]),
+                stn.data.test,
+                stn.data.train
 )
 
 all_values <- all_values[is.finite(all_values)]
 inc=diff(range(all_values))/500
 breaks=seq(quantile(all_values, 0.00025)-inc, quantile(all_values, 0.99975)+inc, inc)
-# brewer.pal(9, "YlGnBu")
-ColScheme <- colorRampPalette(rev(brewer.pal(11, "RdYlBu")))(length(breaks)-1)
+ColScheme <- ColScheme <- colorRampPalette(if(var=="ppt") brewer.pal(9, "YlGnBu") else rev(brewer.pal(11, "RdYlBu")))(length(breaks)-1)
 ColPal <- colorBin(ColScheme, bins=breaks, na.color = "white")
 ColPal.raster <- colorBin(ColScheme, bins=breaks, na.color = "transparent")
 
 
 # leaflet map
-labels <- paste(stn.info.train$Name, "(El. ", stn.info.train$Elevation, "m)", sep="")
-map <- leaflet(stn.info.train) %>%
+labels.train <- paste(stn.info.train$Name, "(El. ", stn.info.train$Elevation, "m)", sep="")
+labels.test <- paste(stn.info.test$Name, "(El. ", stn.info.test$Elevation, "m)", sep="")
+map <- leaflet() %>%
   addTiles(group = "basemap") %>%
   addProviderTiles('Esri.WorldImagery', group = "sat photo") %>%
   addRasterImage(prism_list[[12]], colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "Dec PRISM") %>%
   addRasterImage(fm_list[[12]], colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "Dec FM4") %>%
-  # addRasterImage(spec_list[[1]], colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "Dec GAN50") %>%
+  # addRasterImage(spec_list[[1]], colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "Jan GAN50") %>%
   addRasterImage(debias_list[[12]], colors = ColPal.raster, opacity = 1, maxBytes = 12890669, group = "Dec FM4 debias") %>%
-  addCircleMarkers(lng = ~Long, lat = ~Lat, color="black", fillColor = ~ ColPal(stn.data), opacity = 1, fillOpacity = 1, popup = labels, radius=6, weight=2, group = "Stations") %>%
+  addCircleMarkers(data = stn.info.train, lng = ~Long, lat = ~Lat, color="black", fillColor = ~ ColPal.raster(Dec), opacity = 1, fillOpacity = 1, popup = labels.train, radius=6, weight=2, group = "Training stations") %>%
+    addCircleMarkers(data = stn.info.test, lng = ~Long, lat = ~Lat, color="black", fillColor = ~ ColPal.raster(Dec), opacity = 1, fillOpacity = 1, popup = labels.test, radius=6, weight=2, group = "Test stations") %>%
     addRasterImage(bias[[12]], colors = ColPal.bias, opacity = 1, maxBytes = 12890669, group = "spline") %>%
-  addCircleMarkers(lng = ~Long, lat = ~Lat, color="black", fillColor = ~ ColPal.points(stn.data.bias), opacity = 1, fillOpacity = 1, popup = labels, radius=6, weight=2, group = "Stations error") %>%
+  addCircleMarkers(data = stn.info.train, lng = ~Long, lat = ~Lat, color="black", fillColor = ~ ColPal.points(stn.data.bias), opacity = 1, fillOpacity = 1, popup = labels, radius=6, weight=2, group = "Stations error") %>%
   addLayersControl(
     overlayGroups = c("Dec PRISM",
                       "Dec FM4",
                       # "Jan GAN50",
                       "Dec FM4 debias",
-                      "Stations",
+                      "Training stations",
+                      "Test stations",
                       "spline",
                       "Stations error"
     ),
