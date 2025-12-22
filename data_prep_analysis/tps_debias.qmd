@@ -63,22 +63,22 @@ stn.info.prec.us <- stn.info.prec[Lat<47.5 & Lat>42.0625 & Long > -150 & Long < 
 ppt.test.stations <- stn.info.prec.us %>% slice_sample(n = ceiling(0.10 * nrow(stn.info.prec.us)))
 ppt.eval.stations <- stn.info.prec.us %>% anti_join(ppt.test.stations)
 
-write.csv(ppt.test.stations, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/ppt/", "ppt_test_stations.csv"), row.names = FALSE)
-write.csv(ppt.eval.stations, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/ppt/", "ppt_eval_stations.csv"), row.names = FALSE)
+write.csv(ppt.test.stations, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/ppt/", "ppt_test_stations_10_90.csv"), row.names = FALSE)
+write.csv(ppt.eval.stations, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/ppt/", "ppt_eval_stations_10_90.csv"), row.names = FALSE)
 
 stn.info.tmax.us <- stn.info.tmax[Lat<47.5 & Lat>42.0625 & Long > -150 & Long < -104.9167]
 tmax.test.stations <- stn.info.tmax.us %>% slice_sample(n = ceiling(0.10 * nrow(stn.info.tmax.us)))
 tmax.eval.stations <- stn.info.tmax.us %>% anti_join(tmax.test.stations)
 
-write.csv(tmax.test.stations, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/tmax/", "tmax_test_stations.csv"), row.names = FALSE)
-write.csv(tmax.eval.stations, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/tmax/", "tmax_eval_stations.csv"), row.names = FALSE)
+write.csv(tmax.test.stations, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/tmax/", "tmax_test_stations_10_90.csv"), row.names = FALSE)
+write.csv(tmax.eval.stations, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/tmax/", "tmax_eval_stations_10_90.csv"), row.names = FALSE)
 
 stn.info.tmin.us <- stn.info.tmin[Lat<47.5 & Lat>42.0625 & Long > -150 & Long < -104.9167]
 tmin.test.stations <- stn.info.tmin.us %>% slice_sample(n = ceiling(0.10 * nrow(stn.info.tmin.us)))
 tmin.eval.stations <- stn.info.tmin.us %>% anti_join(tmin.test.stations)
 
-write.csv(tmin.test.stations, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/tmin/", "tmin_test_stations.csv"), row.names = FALSE)
-write.csv(tmin.eval.stations, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/tmin/", "tmin_eval_stations.csv"), row.names = FALSE)
+write.csv(tmin.test.stations, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/tmin/", "tmin_test_stations_10_90.csv"), row.names = FALSE)
+write.csv(tmin.eval.stations, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/tmin/", "tmin_eval_stations_10_90.csv"), row.names = FALSE)
 ```
 
 ### Read in GAN prediction:
@@ -88,8 +88,8 @@ months <- tolower(month.abb)
 gans <- list()
 
 for (i in seq_along(months)) {
-  res <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmin/Model4/", months[i], "/", months[i], "_merged_masked.tif"))
-  plot(res, main = paste(months[i], "FM4"))
+  res <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/", months[i], "/spec1/gen50/", months[i], "_merged_masked.tif"))
+  plot(res, main = paste(months[i], "GAN50"))
   gans[[i]] <- res
 }
 ```
@@ -97,14 +97,14 @@ for (i in seq_along(months)) {
 ### Read in and prep station data:
 
 ```{r}
-var <- "tmin"
+var <- "ppt"
 stns_data <- list()
 dem <- rast(paste("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/dem/dem_debias.tif"))
 
 for (i in seq_along(months)) {
   # load the source STATION data for the BC prism
   dir <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/"
-  stn.info <- fread(paste(dir, var,"/tmin_uscdn_8110.csv", sep="")) #read in
+  stn.info <- fread(paste(dir, var,"/pr_uscdn_8110.csv", sep="")) #read in
   for (j in which(names(stn.info)%in%c(month.abb, "Annual"))) stn.info[get(names(stn.info)[j])==c(-9999), (j):=NA, ] # replace -9999 with NA
   stn.info <- stn.info[-which(Elevation==-9999),]
   stn.info <- stn.info[-which(El_Flag=="@"),]
@@ -112,7 +112,7 @@ for (i in seq_along(months)) {
   stn.info.all <- stn.info[Lat<72 & Lat>42.0625 & Long > -150 & Long < -104.9167]
   stn.info.ca <- stn.info[Lat<72 & Lat>47.5 & Long > -150 & Long < -104.9167]
   
-  stn.info.us <- fread(paste(dir, var,"/tmin_test_stations.csv", sep="")) #read in
+  stn.info.us <- fread(paste(dir, var,"/ppt_test_stations_20_80.csv", sep="")) #read in
   for (j in which(names(stn.info.us)%in%c(month.abb, "Annual"))) stn.info.us[get(names(stn.info.us)[j])==c(-9999), (j):=NA, ] # replace -9999 with NA
   
   stn.info.train <- rbindlist(list(stn.info.ca, stn.info.us))
@@ -182,7 +182,7 @@ for (i in seq_along(months)) {
   ps_df <- ps_df[, colnames(stn.info.train), drop = FALSE] # match column order
   
   # make all stations in training area = 0
-  prism <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/tmin/", months[i], "/prism_train_coarse.nc"))
+  prism <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/PRISM/prec/", months[i], "/prism_train_coarse.nc"))
   all_stns <- vect(as.data.frame(stn.info.train), geom = c("Long", "Lat"), crs = crs(res))
   training <- extract(prism, all_stns)
   inside_training <- !is.na(training[,2])
@@ -221,9 +221,9 @@ for (i in seq_along(months)) {
   corrected <- res + bias_raster
   
   # save spline surface and debiased map
-  writeCDF(bias_raster, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmin/Model4/", months[i], "/spline.nc"), varname='tmin', overwrite = T)
+  writeCDF(bias_raster, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/", months[i], "/spec1/gen50/spline_20_80.nc"), varname='prec', overwrite = T)
 
-  writeCDF(corrected, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmin/Model4/", months[i], "/", months[i], "_debias.nc"), varname='tmin', overwrite = T)
+  writeCDF(corrected, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/", months[i], "/spec1/gen50/", months[i], "_debias_20_80.nc"), varname='prec', overwrite = T)
 }
 ```
 
@@ -266,12 +266,18 @@ var <- "tmin"
 stn.info.test <- fread(paste(dir, var,"/tmin_eval_stations.csv", sep="")) #read in
 for (j in which(names(stn.info.test)%in%c(month.abb, "Annual"))) stn.info.test[get(names(stn.info.test)[j])==c(-9999), (j):=NA, ] # replace -9999 with NA
 stn.info.test[, (month.abb) := lapply(.SD, function(x) x/10), .SDcols = month.abb] # divide by 10
-# stn.info.test[, (month.abb) := lapply(.SD, function(x) log1p(x)), .SDcols = "Jan"]
+if (var == "ppt") {
+  stn.info.test[, (month.abb) := lapply(.SD, function(x) log1p(x)), .SDcols = month.abb]
+} else {
+  stn.info.test[, (month.abb) := lapply(.SD, function(x) x/10), .SDcols = month.abb] # divide by 10
+}
 stn.data.test <- stn.info.test[,get("Dec")]
 stn.data.test <- stn.data.test[is.finite(stn.data.test)]
 
 stn.info.train <- stns_data[[12]]
-# stn.info.train[, (month.abb) := lapply(.SD, function(x) log1p(x)), .SDcols = "Jan"]
+if (var == "ppt") {
+  stn.info.train[, (month.abb) := lapply(.SD, function(x) log1p(x)), .SDcols = "Jan"]
+}
 stn.info.train <- stn.info.train[stn.info.train$bias != 0, ]
 stn.data.train <- stn.info.train[,get("Dec")]
 stn.data.train <- stn.data.train[is.finite(stn.data.train)]
@@ -342,4 +348,31 @@ map <- leaflet() %>%
     options = layersControlOptions(collapsed = FALSE)
   )
 map
+```
+
+### Calculate MAE of withheld US stations and debiased prediction:
+
+```{r}
+# extract the values of debiased GAN at the withheld US weather stations
+var <- "ppt"
+dem <- rast(paste("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/dem/dem_debias.tif"))
+
+stn.info.test <- fread(paste(dir, var,"/ppt_eval_stations.csv", sep="")) #read in
+for (j in which(names(stn.info.test)%in%c(month.abb, "Annual"))) stn.info.test[get(names(stn.info.test)[j])==c(-9999), (j):=NA, ] # replace -9999 with NA
+
+if (var != "ppt") {
+  stn.info.test[, (month.abb) := lapply(.SD, function(x) x/10), .SDcols = month.abb] # divide by 10
+}
+
+test.pts <- vect(as.data.frame(stn.info.test), geom = c("Long", "Lat"), crs = crs(dem))
+
+mae <- list()
+
+for (i in seq_along(months)) {
+  db <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/", months[i], "/spec1/gen50/", months[i], "_debias.nc"))
+  
+  month <- stringr::str_to_title(months[i])
+  mae[[i]] <- stn.info.test[, mean(abs(stn.info.test[[month]] - terra::extract(db, test.pts)[,2]), na.rm = TRUE)]
+}
+names(mae) <- paste(month.abb, var)
 ```
