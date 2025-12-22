@@ -221,9 +221,9 @@ for (i in seq_along(months)) {
   corrected <- res + bias_raster
   
   # save spline surface and debiased map
-  writeCDF(bias_raster, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/", months[i], "/spec1/gen50/spline_20_80.nc"), varname='prec', overwrite = T)
+  writeCDF(bias_raster, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/", months[i], "/spec1/gen50/spline.nc"), varname='prec', overwrite = T)
 
-  writeCDF(corrected, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/", months[i], "/spec1/gen50/", months[i], "_debias_20_80.nc"), varname='prec', overwrite = T)
+  writeCDF(corrected, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/", months[i], "/spec1/gen50/", months[i], "_debias.nc"), varname='prec', overwrite = T)
 }
 ```
 
