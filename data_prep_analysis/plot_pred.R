@@ -4,7 +4,6 @@ library(terra)
 library(data.table)
 library(leaflet)
 library(RColorBrewer)
-library(ranger)
 library(rworldmap)
 library(htmlwidgets)
 
