@@ -354,13 +354,13 @@ map
 
 ```{r}
 # extract the values of debiased GAN at the withheld US weather stations
-var <- "ppt"
+var <- "tmin"
 dem <- rast(paste("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/dem/dem_debias.tif"))
 
 dir <- "C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Stations/"
 months <- tolower(month.abb)
 
-stn.info.test <- fread(paste(dir, var,"/ppt_eval_stations_10_90.csv", sep="")) #read in
+stn.info.test <- fread(paste(dir, var,"/tmin_eval_stations_10_90.csv", sep="")) #read in
 for (j in which(names(stn.info.test)%in%c(month.abb, "Annual"))) stn.info.test[get(names(stn.info.test)[j])==c(-9999), (j):=NA, ] # replace -9999 with NA
 
 if (var != "ppt") {
@@ -369,14 +369,18 @@ if (var != "ppt") {
 
 test.pts <- vect(as.data.frame(stn.info.test), geom = c("Long", "Lat"), crs = crs(dem))
 
-mae_dt <- data.table(month = month.abb, MAE = NA)
+mae_dt <- data.table(month = month.abb, nondb_MAE = NA, db_MAE = NA, diff = NA)
 
 for (i in seq_along(months)) {
-  db <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/", months[i], "/spec1/gen50/", months[i], "_debias.nc"))
+  db <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmin/Model4/", months[i], "/", months[i], "_debias.nc"))
+  
+  non_db <- rast(paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmin/Model4/", months[i], "/", months[i], "_merged_masked.tif"))
   
   month <- stringr::str_to_title(months[i])
-  mae_dt$MAE[mae_dt$month == month] <- stn.info.test[, mean(abs(stn.info.test[[month]] - terra::extract(db, test.pts)[,2]), na.rm = TRUE)]
+  mae_dt$nondb_MAE[mae_dt$month == month] <- stn.info.test[, mean(abs(stn.info.test[[month]] - terra::extract(non_db, test.pts)[,2]), na.rm = TRUE)]
+  mae_dt$db_MAE[mae_dt$month == month] <- stn.info.test[, mean(abs(stn.info.test[[month]] - terra::extract(db, test.pts)[,2]), na.rm = TRUE)]
+  mae_dt$diff[mae_dt$month == month] <- (stn.info.test[, mean(abs(stn.info.test[[month]] - terra::extract(db, test.pts)[,2]), na.rm = TRUE)] - stn.info.test[, mean(abs(stn.info.test[[month]] - terra::extract(non_db, test.pts)[,2]), na.rm = TRUE)])
 }
 
-write.csv(mae_dt, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/US_MAE.csv"), row.names = FALSE)
+write.csv(mae_dt, paste0("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/tmin/Model4/US_MAE.csv"), row.names = FALSE)
 ```
