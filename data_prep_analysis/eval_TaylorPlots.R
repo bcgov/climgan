@@ -22,14 +22,16 @@ element.names <- c("Tmin", "Tmax", "Precipitation")
 
 studyarea <- ext(c(-143.5, -105, 45, 65))
 
-dir <- paste("C:/Users/CMAHONY/OneDrive - Government of BC/Data/climr_mosaic/", sep="")
-dem <- rast(paste(dir, "climr_mosaic_dem_800m.tif", sep=""))
+# dir <- paste("C:/Users/CMAHONY/OneDrive - Government of BC/Data/climr_mosaic/", sep="")
+# dem <- rast(paste(dir, "climr_mosaic_dem_800m.tif", sep=""))
+dem <- rast(paste0("O:/Climatologies/climr_mosaic/climr_mosaic_dem_800m.tif"))
 dem <- crop(dem, studyarea)
 X <- dem
 
 #PRISM DEM
-dir <- paste("C:/Users/CMAHONY/OneDrive - Government of BC/Data/PRISM_BC/PRISM_dem/", sep="")
-dem.bc <- rast(paste(dir, "PRISM_dem.asc", sep=""))
+# dir <- paste("C:/Users/CMAHONY/OneDrive - Government of BC/Data/PRISM_BC/PRISM_dem/", sep="")
+# dem.bc <- rast(paste(dir, "PRISM_dem.asc", sep=""))
+dem.bc <- rast(paste0("O:/Climatologies/PRISM_BC/PRISM_dem/PRISM_dem.asc"))
 
 slope <- terrain(dem, v = "slope", unit = "radians")   # or unit = "degrees" if preferred
 aspect <- terrain(dem, v = "aspect", unit = "radians")
@@ -80,30 +82,38 @@ plot(region4, add=T, border="red")
 ## 
 #######################
 
-# datasets <- c("climr", "fm", "sp", "db")
-# datasets.names <- c("climr", "Foundational", "Specialized", "Debiased")
+datasets <- c("climr", "fm", "sp", "db")
+datasets.names <- c("climr", "Foundational", "Specialized", "Debiased")
 
-datasets <- c("climr", "fm", "sp")
-datasets.names <- c("climr", "Foundational", "Specialized")
+# datasets <- c("climr", "fm", "sp")
+# datasets.names <- c("climr", "Foundational", "Specialized")
 
 monthpair <- c(4,10)
 monthpair <- c(1,7)
 # monthpair <- c(6,12)
+monthpair <- c(1,2,3,4,5,6)
+# monthpair <- c(7,8,9,10,11,12)
+monthpair <- c(1,4,7,10)
 
 # STANDARD loop for a six-panel plot (uncomment the for loops and deactivate the alternative single-panel figure)
-png(filename=paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Figures/GanEval.TaylorPlots", paste(month.abb[monthpair], collapse = ""), "png",sep="."), type="cairo", units="in", width=9, height=6.25, pointsize=10, res=600)
-par(mfrow=c(2,3), mar=c(0,0,0,0), mgp=c(2,0.25, 0), tck=-0.01)
+# png(filename=paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Figures/GanEval.TaylorPlots", paste(month.abb[monthpair], collapse = ""), "png",sep="."), type="cairo", units="in", width=9, height=6.25, pointsize=10, res=600)
+# png(filename=paste("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/prec/Model4/GAN.Eval.TaylorPlot", paste(month.abb[monthpair], collapse = ""), "png",sep="."), type="cairo", units="in", width=9, height=6.25, pointsize=10, res=600)
+png(filename=paste("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/figure5.png", sep=""), type="cairo", units="in", width=10, height=2.75, pointsize=8, res=600)
+
+# par(mfrow=c(2,3), mar=c(0,0,0,0), mgp=c(2,0.25, 0), tck=-0.01)
+par(mfrow=c(1,4), mar=c(0,0,0,0), mgp=c(2,0.25, 0), tck=-0.01)
 m=6
 for(m in monthpair){
   monthcode = monthcodes[m]
   
-  e=1
-  for(e in 1:3){
+  e=3
+  for(e in 1:1){
     element = elements[e]
     
     # load the source STATION data for the BC prism
-    dir <- paste("C:/Users/CMAHONY/OneDrive - Government of BC/Data/PRISM_BC/", sep="")
-    stn.info <- fread(paste(dir, "Stations/",c("Tmin", "Tmax", "Pr")[e],"_uscdn_8110.csv", sep="")) #read in
+    # dir <- paste("C:/Users/CMAHONY/OneDrive - Government of BC/Data/PRISM_BC/", sep="")
+    dir <- paste("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/", sep="")
+    stn.info <- fread(paste(dir, "Stations/", c("tmin/", "tmax/", "ppt/")[e], c("tmin", "tmax", "pr")[e],"_uscdn_8110.csv", sep="")) #read in
     for (i in which(names(stn.info)%in%c(month.abb, "Annual"))) stn.info[get(names(stn.info)[i])==c(-9999), (i):=NA, ] # replace -9999 with NA
     stn.info <- stn.info[-which(El_Flag=="@"),]
     stn <- vect(stn.info, geom = c("Long", "Lat"), crs = "EPSG:4326")
@@ -111,6 +121,14 @@ for(m in monthpair){
     stn.data <- if(e==3) log2(stn.data) else stn.data/10
     stn.info <- stn.info[is.finite(stn.data),]
     stn.data <- stn.data[is.finite(stn.data)]
+    
+    # withheld stations for evaluating US
+    stn.info.us <- fread(paste(dir, "Stations/", c("tmin/", "tmax/", "ppt/")[e], c("tmin", "tmax", "ppt")[e],"_eval_stations_10_90.csv", sep="")) #read in
+    stn.us <- vect(stn.info.us, geom = c("Long", "Lat"), crs = "EPSG:4326")
+    stn.us.data <- stn.info.us[,get(month.abb[m])]
+    stn.us.data <- if(e==3) log2(stn.us.data) else stn.us.data/10
+    stn.info.us <- stn.info.us[is.finite(stn.us.data),]
+    stn.us.data <- stn.us.data[is.finite(stn.us.data)]
     
     # ###########################################################
     # ## plot a key map
@@ -149,12 +167,10 @@ for(m in monthpair){
     climr <- rast(paste("//objectstore2.nrs.bcgov/ffec/Climatologies/climr_mosaic/climr_mosaic_1981_2010_", c("Tmin", "Tmax", "Pr")[e], monthcodes[m], ".tif", sep=""))
     
     # load the foundational model
-    fm <- rast(paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Tirion/Results/foundational_model/", elements[e], "/Model4/", tolower(month.abb[m]), "/", tolower(month.abb[m]), "_fullregion_masked.nc", sep=""))
-    if(e==3) fm <- expm1(fm) # TEMPORARY UNTIL TIRION PRODUCES RESULTS IN MM/MONTH.
+    fm <- rast(paste("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/", elements[e], "/Model4/", tolower(month.abb[m]), "/", tolower(month.abb[m]), "_merged_masked.tif", sep=""))
     
-    # # load the debiased model
-    # db <- rast(paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Tirion/Results/foundational_model/", elements[e], "/Model4/", tolower(month.abb[m]), "/spec1/debias/", tolower(month.abb[m]), "_fullregion_masked.nc", sep=""))
-    # if(e==3) db <- expm1(db) # TEMPORARY UNTIL TIRION PRODUCES RESULTS IN MM/MONTH.
+    # load the debiased model
+    db <- rast(paste("C:/Users/TGRICE/OneDrive - Government of BC/Documents/GANs/Tirion/Results/foundational_model/", elements[e], "/Model4/", tolower(month.abb[m]), "/", tolower(month.abb[m]), "_debias.nc", sep=""))
 
     # optional loop for comparing generators from different epochs
     epochs <- c(10, 20, 30, 40, seq(50,250,50))
@@ -163,13 +179,16 @@ for(m in monthpair){
     
     # load the specialized model
     sp <- rast(paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Tirion/Results/foundational_model/", elements[e], "/Model4/", tolower(month.abb[m]), "/spec1/gen",epoch,"/", tolower(month.abb[m]), "_fullregion_masked.nc", sep=""))
-    if(e==3) sp <- expm1(sp) # TEMPORARY UNTIL TIRION PRODUCES RESULTS IN MM/MONTH.
 
     # ALTERNATIVE: plot a single taylor plot. 
     # png(filename=paste("//objectstore2.nrs.bcgov/ffec/Mosaic_Yukon/Figures/GanEval.TaylorPlot", elements[e], month.abb[m], paste0("gen", epoch), "png",sep="."), type="cairo", units="in", width=5, height=5, pointsize=10, res=600)
     # par(mfrow=c(1,1), mar=c(2,2,1,1), mgp=c(2,0.25, 0), tck=-0.01)
     
-    taylor.diagram(ref = 0:5, model = 0:5, main = paste(month.name[m], element.names[e], "- epoch", epoch),
+    # taylor.diagram(ref = 0:5, model = 0:5, main = paste(month.name[m], element.names[e], "- epoch", epoch),
+    #                col = "black", pch = 1, cex = 1, normalize = TRUE, xlab="",
+    #                sd.arcs = TRUE, grad.corr.lines = TRUE, pos.cor = TRUE)
+    
+    taylor.diagram(ref = 0:5, model = 0:5, main = paste(month.name[m], element.names[e], "- FM4 (FM4s: epoch", epoch, ")"),
                    col = "black", pch = 1, cex = 1, normalize = TRUE, xlab="",
                    sd.arcs = TRUE, grad.corr.lines = TRUE, pos.cor = TRUE)
     
@@ -199,10 +218,23 @@ for(m in monthpair){
       region <- get(paste("region", r, sep="")) 
       crs(region) <- "EPSG:4326"
       
-      stn.vect <- vect(stn.info, geom = c("Long", "Lat"), crs = "EPSG:4326")
-      stn.crop <- crop(stn.vect, region)
-      stn.values <- as.data.frame(stn.crop)[,which(names(stn.crop)==month.abb[m])]
-      stn.values <- if(e==3) log2(stn.values) else stn.values/10
+      # use only eval stations in the US
+      if (r == "US") {
+        stn.vect <- vect(stn.info.us, geom = c("Long", "Lat"), crs = "EPSG:4326")
+        stn.crop <- crop(stn.vect, region)
+        stn.values <- as.data.frame(stn.crop)[,which(names(stn.crop)==month.abb[m])]
+        stn.values <- if(e==3) log2(stn.values) else stn.values/10
+      } else {
+        stn.vect <- vect(stn.info, geom = c("Long", "Lat"), crs = "EPSG:4326")
+        stn.crop <- crop(stn.vect, region)
+        stn.values <- as.data.frame(stn.crop)[,which(names(stn.crop)==month.abb[m])]
+        stn.values <- if(e==3) log2(stn.values) else stn.values/10
+      }
+      
+      # stn.vect <- vect(stn.info, geom = c("Long", "Lat"), crs = "EPSG:4326")
+      # stn.crop <- crop(stn.vect, region)
+      # stn.values <- as.data.frame(stn.crop)[,which(names(stn.crop)==month.abb[m])]
+      # stn.values <- if(e==3) log2(stn.values) else stn.values/10
       
       for(dataset in datasets){
         d=which(datasets==dataset)
